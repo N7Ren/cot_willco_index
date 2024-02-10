@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFrame Table</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>WillCo Index Calculations</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+        }
+        .button-container {
+            display: flex;
+        }
+        .button {
+            margin-right: 10px;
+        }
+        .styled-table th,
+        .styled-table td {
+            /* border: 1px solid white; */
+            text-align: center;
+            padding: 5px;
+        }
+        
+    </style>
+</head>
+<body>    
+    <h1>WillCo Index Calculations</h1>
+    <div class="button-container">
+        <form method="POST" action="/fetch_and_store">
+            <button class="button type="submit">Fetch and store COT data</button>
+        </form>
+        <form method="POST" action="/indexfilter">
+            <button class="button type="submit">Show potential setups</button>
+        </form>
+        <form method="POST" action="/percentchangefilter">
+            <button class="button type="submit">Show >= 5% changes</button>
+        </form>
+        <form method="post" action="/filterasset">
+            <label for="asset_dropdown">Select an Asset:</label>
+            <select name="asset_dropdown" id="asset_dropdown">
+                {% for index, name in dropdown_options %}
+                    <option value="{{ index }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Filter Asset">
+        </form>
+        <form method="POST" action="/nofilter">
+            <button class="button type="submit">Reset filter</button>
+        </form>
+    </div>
+    <br/>
+    <div class="styled-table">
+        {{ table_html | safe }}
+    </div>
+</body>
+</html>
