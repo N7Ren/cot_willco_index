@@ -1,10 +1,11 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for
 import pandas as pd
 from willco import WillCo
 
 app = Flask(__name__)
 
-csv_path = 'cot.csv'
+csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
 will_co = WillCo(csv_path)
 
 markets = pd.DataFrame({

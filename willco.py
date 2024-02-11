@@ -1,3 +1,4 @@
+import os
 import cot_reports as cot
 import pandas as pd
 import datetime
@@ -6,6 +7,8 @@ class WillCo:
 
     def __init__(self, csv_path):        
         self.csv_path = csv_path
+        if not os.path.exists(self.csv_path):
+            self.fetch_and_store_cot_data()
 
     def read_csv(self):
         return pd.read_csv(self.csv_path)
