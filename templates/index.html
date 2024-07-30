@@ -38,11 +38,11 @@
         <form method="POST" action="/percentchangefilter">
             <button class="button type="submit">Show >= 5% changes</button>
         </form>
-        <form method="post" action="/filterasset">
+        <form method="post" action="/assetfilter">
             <label for="asset_dropdown">Select an Asset:</label>
             <select name="asset_dropdown" id="asset_dropdown">
-                {% for index, name in dropdown_options %}
-                    <option value="{{ index }}">{{ name }}</option>
+                {% for name in dropdown_options %}
+                    <option value="{{ name }}">{{ name }}</option>
                 {% endfor %}
             </select>
             <input type="submit" value="Filter Asset">

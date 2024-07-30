@@ -39,7 +39,7 @@ def color_percent(val, column):
             return 'color: green'
     return 'color: white'
 
-def generateTable(filter):
+def generateTable(filter, selected_name=None):
     csv_df = will_co.read_csv()
     
     result = pd.DataFrame()
@@ -62,6 +62,8 @@ def generateTable(filter):
         result = result[(result['willco_commercials_index'] >= 95) | (result['willco_commercials_index'] <= 5) | ((result['willco_large_specs_index'] >= 95) | (result['willco_large_specs_index'] <= 5)) | ((result['willco_small_specs_index'] >= 95) | (result['willco_small_specs_index'] <= 5))]
     elif filter == 2:
         result = result[(result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5) | ((result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)) | ((result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5))]
+    elif filter == 3:
+        result = result[result['market_and_exchange_names'] == selected_name]
 
     styled_df = result.style.map(lambda val: color_index(val, 'willco_commercials_index'), subset='willco_commercials_index')\
                         .map(lambda val: color_index(val, 'willco_large_specs_index'), subset='willco_large_specs_index')\
@@ -79,7 +81,7 @@ def generateTable(filter):
 
 @app.route('/')
 def index():
-    dropdown_options = [(index, name) for index, name in enumerate(markets['contract_names'])]
+    dropdown_options = markets['contract_names']
     return render_template('index.html', table_html=generateTable(False), dropdown_options=dropdown_options)
 
 @app.route('/fetch_and_store', methods=['POST'])
@@ -97,7 +99,8 @@ def percentchangefilter():
 
 @app.route('/assetfilter', methods=['POST'])
 def assetfilter():
-    return redirect('/') 
+    selected_name = request.form.get('asset_dropdown')
+    return render_template('index.html', table_html=generateTable(3, selected_name))
 
 @app.route('/nofilter', methods=['POST'])
 def nofilter():
