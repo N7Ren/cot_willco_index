@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 
 *.csv
+*.db
+*.zip
+*.db-journal

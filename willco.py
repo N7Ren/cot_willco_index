@@ -2,22 +2,23 @@ import os
 import cot_reports as cot
 import pandas as pd
 import datetime
+import sqlite3
+from markets import markets
 
 class WillCo:
 
-    def __init__(self, csv_path):        
-        self.csv_path = csv_path
-        if not os.path.exists(self.csv_path):
+    def __init__(self, db_path):        
+        self.db_path = db_path
+        if not os.path.exists(self.db_path):
             self.fetch_and_store_cot_data()
-
-    def read_csv(self):
-        return pd.read_csv(self.csv_path)
-
+            self.will_co.calculateWillCo(markets);
+    
     def fetch_and_store_cot_data(self):
         df = pd.DataFrame()
-        end_year = int(datetime.date.today().strftime('%Y')) + 1
-        begin_year = end_year - 7
-        for i in reversed(range(begin_year, end_year)):
+        begin_year = 2017
+        end_year = 2024
+
+        for i in range(begin_year, end_year + 1):
             single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut')) 
             df = pd.concat([df, single_year], ignore_index=True)
 
@@ -53,66 +54,260 @@ class WillCo:
         df['large_speculators_net_percent'] = df['percent_large_speculators_long'] - df['percent_large_speculators_short']
         df['small_speculators_net_percent'] = df['percent_small_speculators_long'] - df['percent_small_speculators_short']
 
-        df.to_csv(self.csv_path, index=False)
+        df['min_q_c_0_5y'] = 0.0
+        df['max_q_c_0_5y'] = 0.0
+        df['min_q_nc_0_5y'] = 0.0
+        df['max_q_nc_0_5y'] = 0.0
+        df['min_q_nr_0_5y'] = 0.0
+        df['max_q_nr_0_5y'] = 0.0
 
-    def calculateWillCo(self, df, market, weeks):
-        asset = df[df['cftc_contract_market_code'] == market].copy()
+        df['min_q_c_1y'] = 0.0
+        df['max_q_c_1y'] = 0.0
+        df['min_q_nc_1y'] = 0.0
+        df['max_q_nc_1y'] = 0.0
+        df['min_q_nr_1y'] = 0.0
+        df['max_q_nr_1y'] = 0.0
 
-        asset['lookback_(y)'] = "{:.1f}".format(weeks / 52)
+        df['min_q_c_2y'] = 0.0
+        df['max_q_c_2y'] = 0.0
+        df['min_q_nc_2y'] = 0.0
+        df['max_q_nc_2y'] = 0.0
+        df['min_q_nr_2y'] = 0.0
+        df['max_q_nr_2y'] = 0.0
 
-        qCommercials = []
-        qLargeSpeculators = []
-        qSmallSpeculators = []
+        df['min_q_c_3y'] = 0.0
+        df['max_q_c_3y'] = 0.0
+        df['min_q_nc_3y'] = 0.0
+        df['max_q_nc_3y'] = 0.0
+        df['min_q_nr_3y'] = 0.0
+        df['max_q_nr_3y'] = 0.0
 
-        for i in range(0, weeks + 1):
-            try:
-                qCommercials.append(asset.iloc[i]['q_commercials'])
-            except IndexError:
-                qCommercials.append(0)
+        df['min_q_c_4y'] = 0.0
+        df['max_q_c_4y'] = 0.0
+        df['min_q_nc_4y'] = 0.0
+        df['max_q_nc_4y'] = 0.0
+        df['min_q_nr_4y'] = 0.0
+        df['max_q_nr_4y'] = 0.0
 
-            try:
-                qLargeSpeculators.append(asset.iloc[i]['q_large_speculators'])
-            except IndexError:
-                qLargeSpeculators.append(0)
+        df['min_q_c_5y'] = 0.0
+        df['max_q_c_5y'] = 0.0
+        df['min_q_nc_5y'] = 0.0
+        df['max_q_nc_5y'] = 0.0
+        df['min_q_nr_5y'] = 0.0
+        df['max_q_nr_5y'] = 0.0
+
+        df['c_index_0_5y'] = -1
+        df['nc_index_0_5y'] = -1
+        df['nr_index_0_5y'] = -1
+
+        df['c_index_1y'] = -1
+        df['nc_index_1y'] = -1
+        df['nr_index_1y'] = -1
+
+        df['c_index_2y'] = -1
+        df['nc_index_2y'] = -1
+        df['nr_index_2y'] = -1
+
+        df['c_index_3y'] = -1
+        df['nc_index_3y'] = -1
+        df['nr_index_3y'] = -1
+
+        df['c_index_4y'] = -1
+        df['nc_index_4y'] = -1
+        df['nr_index_4y'] = -1
+
+        df['c_index_5y'] = -1
+        df['nc_index_5y'] = -1
+        df['nr_index_5y'] = -1
+
+
+        connection = sqlite3.connect(self.db_path)
+        df.to_sql('cot_table', connection, if_exists='replace', index=True, index_label='id')
+        connection.commit()
+        connection.close()
+
+    def calculateWillCo(self, markets):
+        for market in list(markets['contract_code']):
+            self.calculateWillCoMinMax(market, 26)
+            self.calculateWillCoMinMax(market, 52)
+            self.calculateWillCoMinMax(market, 104)
+            self.calculateWillCoMinMax(market, 156)
+            self.calculateWillCoMinMax(market, 208)
+            self.calculateWillCoMinMax(market, 260)
+
+        self.calculateWillCoIndex(market)
+
+
+    def calculateWillCoMinMax(self, market, weeks):
+        connection = sqlite3.connect(self.db_path)
+        cursor = connection.cursor()
+
+        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc", connection, params=(market,))
+
+        for i in range(len(df) - weeks + 1):
+            print(i)
+
+            c_min_val = df['q_commercials'].iloc[i:i + weeks].min()
+            nc_min_val = df['q_large_speculators'].iloc[i:i + weeks].min()
+            nr_min_val = df['q_small_speculators'].iloc[i:i + weeks].min()
+
+            c_max_val = df['q_commercials'].iloc[i:i + weeks].max()
+            nc_max_val = df['q_large_speculators'].iloc[i:i + weeks].max()
+            nr_max_val = df['q_small_speculators'].iloc[i:i + weeks].max()
+
+            if weeks == 26:
+                df.at[i, 'min_q_c_0_5y'] = c_min_val
+                df.at[i, 'min_q_nc_0_5y'] = nc_min_val
+                df.at[i, 'min_q_nr_0_5y'] = nr_min_val
+                df.at[i, 'max_q_c_0_5y'] = c_max_val
+                df.at[i, 'max_q_nc_0_5y'] = nc_max_val
+                df.at[i, 'max_q_nr_0_5y'] = nr_max_val
+            elif weeks == 52:
+                df.at[i, 'min_q_c_1y'] = c_min_val
+                df.at[i, 'min_q_nc_1y'] = nc_min_val
+                df.at[i, 'min_q_nr_1y'] = nr_min_val
+                df.at[i, 'max_q_c_1y'] = c_max_val
+                df.at[i, 'max_q_nc_1y'] = nc_max_val
+                df.at[i, 'max_q_nr_1y'] = nr_max_val
+            elif weeks == 104:
+                df.at[i, 'min_q_c_2y'] = c_min_val
+                df.at[i, 'min_q_nc_2y'] = nc_min_val
+                df.at[i, 'min_q_nr_2y'] = nr_max_val
+                df.at[i, 'max_q_c_2y'] = c_max_val
+                df.at[i, 'max_q_nc_2y'] = nc_max_val
+                df.at[i, 'max_q_nr_2y'] = nr_max_val
+            elif weeks == 156:
+                df.at[i, 'min_q_c_3y'] = c_min_val
+                df.at[i, 'min_q_nc_3y'] = nc_min_val
+                df.at[i, 'min_q_nr_3y'] = nr_min_val
+                df.at[i, 'max_q_c_3y'] = c_max_val
+                df.at[i, 'max_q_nc_3y'] = nc_max_val
+                df.at[i, 'max_q_nr_3y'] = nr_max_val
+            elif weeks == 208:
+                df.at[i, 'min_q_c_4y'] = c_min_val
+                df.at[i, 'min_q_nc_4y'] = nc_min_val
+                df.at[i, 'min_q_nr_4y'] = nr_min_val
+                df.at[i, 'max_q_c_4y'] = c_max_val
+                df.at[i, 'max_q_nc_4y'] = nc_max_val
+                df.at[i, 'max_q_nr_4y'] = nr_max_val
+            elif weeks == 260:
+                df.at[i, 'min_q_c_5y'] = c_min_val
+                df.at[i, 'min_q_nc_5y'] = nc_min_val
+                df.at[i, 'min_q_nr_5y'] = nr_min_val
+                df.at[i, 'max_q_c_5y'] = c_max_val
+                df.at[i, 'max_q_nc_5y'] = nc_max_val
+                df.at[i, 'max_q_nr_5y'] = nr_max_val
+
+            for i, row in df.iterrows():
+                if weeks == 26:
+                    cursor.execute("UPDATE cot_table SET min_q_c_0_5y = ? WHERE id = ?", (row['min_q_c_0_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_0_5y = ? WHERE id = ?", (row['min_q_nc_0_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_0_5y = ? WHERE id = ?", (row['min_q_nr_0_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_0_5y = ? WHERE id = ?", (row['max_q_c_0_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_0_5y = ? WHERE id = ?", (row['max_q_nc_0_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_0_5y = ? WHERE id = ?", (row['max_q_nr_0_5y'], row['id']))
+                elif weeks == 52:
+                    cursor.execute("UPDATE cot_table SET min_q_c_1y = ? WHERE id = ?", (row['min_q_c_1y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_1y = ? WHERE id = ?", (row['min_q_nc_1y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_1y = ? WHERE id = ?", (row['min_q_nr_1y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_1y = ? WHERE id = ?", (row['max_q_c_1y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_1y = ? WHERE id = ?", (row['max_q_nc_1y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_1y = ? WHERE id = ?", (row['max_q_nr_1y'], row['id']))
+                elif weeks == 104:
+                    cursor.execute("UPDATE cot_table SET min_q_c_2y = ? WHERE id = ?", (row['min_q_c_2y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_2y = ? WHERE id = ?", (row['min_q_nc_2y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_2y = ? WHERE id = ?", (row['min_q_nr_2y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_2y = ? WHERE id = ?", (row['max_q_c_2y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_2y = ? WHERE id = ?", (row['max_q_nc_2y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_2y = ? WHERE id = ?", (row['max_q_nr_2y'], row['id']))
+                elif weeks == 156:
+                    cursor.execute("UPDATE cot_table SET min_q_c_3y = ? WHERE id = ?", (row['min_q_c_3y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_3y = ? WHERE id = ?", (row['min_q_nc_3y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_3y = ? WHERE id = ?", (row['min_q_nr_3y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_3y = ? WHERE id = ?", (row['max_q_c_3y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_3y = ? WHERE id = ?", (row['max_q_nc_3y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_3y = ? WHERE id = ?", (row['max_q_nr_3y'], row['id']))
+                elif weeks == 208:
+                    cursor.execute("UPDATE cot_table SET min_q_c_4y = ? WHERE id = ?", (row['min_q_c_4y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_4y = ? WHERE id = ?", (row['min_q_nc_4y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_4y = ? WHERE id = ?", (row['min_q_nr_4y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_4y = ? WHERE id = ?", (row['max_q_c_4y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_4y = ? WHERE id = ?", (row['max_q_nc_4y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_4y = ? WHERE id = ?", (row['max_q_nr_4y'], row['id']))
+                elif weeks == 260:
+                    cursor.execute("UPDATE cot_table SET min_q_c_5y = ? WHERE id = ?", (row['min_q_c_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nc_5y = ? WHERE id = ?", (row['min_q_nc_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET min_q_nr_5y = ? WHERE id = ?", (row['min_q_nr_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_c_5y = ? WHERE id = ?", (row['max_q_c_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nc_5y = ? WHERE id = ?", (row['max_q_nc_5y'], row['id']))
+                    cursor.execute("UPDATE cot_table SET max_q_nr_5y = ? WHERE id = ?", (row['max_q_nr_5y'], row['id']))
             
-            try:
-                qSmallSpeculators.append(asset.iloc[i]['q_small_speculators'])
-            except IndexError:
-                qSmallSpeculators.append(0)
+        connection.commit()
+        connection.close()
 
-        minQCommercialsNWeeks = min(qCommercials)
-        maxQCommercialsNWeeks = max(qCommercials)
+    def calculateWillCoIndex(self, market):
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        cursor = connection.cursor()
 
-        minQLargeSpeculatorsNWeeks = min(qLargeSpeculators)
-        maxQLargeSpeculatorsNWeeks = max(qLargeSpeculators)
+        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc", connection, params=(market,))
+        rows = cursor.fetchall()
 
-        minQSmallpeculatorsNWeeks = min(qSmallSpeculators)
-        maxQSmallpeculatorsNWeeks = max(qSmallSpeculators)
+        q_c = rows[0]['q_commercials'];
+        q_nc = rows[0]['q_large_speculators'];
+        q_nr = rows[0]['q_small_speculators'];
 
-        asset['willco_commercials_index'] = round(((asset.iloc[0]['q_commercials'] - minQCommercialsNWeeks) / (maxQCommercialsNWeeks - minQCommercialsNWeeks)) * 100)
-        asset['willco_large_specs_index'] = round(((asset.iloc[0]['q_large_speculators'] - minQLargeSpeculatorsNWeeks) / (maxQLargeSpeculatorsNWeeks - minQLargeSpeculatorsNWeeks)) * 100)
-        asset['willco_small_specs_index'] = round(((asset.iloc[0]['q_small_speculators'] - minQSmallpeculatorsNWeeks) / (maxQSmallpeculatorsNWeeks - minQSmallpeculatorsNWeeks)) * 100)
+        for row in rows:
+            print(row)
 
-        if weeks == 26:
-            asset['commercials_net_(%)'] = (asset.iloc[0]['commercials_net_percent'].round(2) * 100).astype(int)
-            asset['large_speculators_net_(%)'] = (asset.iloc[0]['large_speculators_net_percent'].round(2) * 100).astype(int)
-            asset['small_speculators_net_(%)'] = (asset.iloc[0]['small_speculators_net_percent'].round(2) * 100).astype(int)
+            c_index_0_5y = round(((q_c - row["min_q_c_0_5y"]) / (row["max_q_c_0_5y"] - row["min_q_c_0_5y"])) * 100)
+            nc_index_0_5y = round(((q_nc - row["min_q_nc_0_5y"]) / (row["max_q_nc_0_5y"] - row["min_q_nc_0_5y"])) * 100)
+            nr_index_0_5y = round(((q_nr - row["min_q_nr_0_5y"]) / (row["max_q_nr_0_5y"] - row["min_nr_c_0_5y"])) * 100)
 
-            asset['commercials_change_(%)'] = ((asset.iloc[0]['percent_commercials_long'] - asset.iloc[1]['percent_commercials_long']).round(2) * 100).astype(int)
-            asset['large_speculators_change_(%)'] = ((asset.iloc[0]['percent_large_speculators_long'] - asset.iloc[1]['percent_large_speculators_long']).round(2) * 100).astype(int)
-            asset['small_speculators_change_(%)'] = ((asset.iloc[0]['percent_small_speculators_long'] - asset.iloc[1]['percent_small_speculators_long']).round(2) * 100).astype(int)
-        else:
-            asset['commercials_net_(%)'] = 0
-            asset['large_speculators_net_(%)'] = 0
-            asset['small_speculators_net_(%)'] = 0
+            c_index_1y = round(((q_c - row["min_q_c_1y"]) / (row["max_q_c_1y"] - row["min_q_c_1y"])) * 100)
+            nc_index_1y = round(((q_nc - row["min_q_nc_1y"]) / (row["max_q_nc_1y"] - row["min_q_nc_1y"])) * 100)
+            nr_index_1y = round(((q_nr - row["min_q_nr_1y"]) / (row["max_q_nr_1y"] - row["min_nr_c_1y"])) * 100)
 
-            asset['commercials_change_(%)'] = 0
-            asset['large_speculators_change_(%)'] = 0
-            asset['small_speculators_change_(%)'] = 0
+            c_index_2y = round(((q_c - row["min_q_c_2y"]) / (row["max_q_c_2y"] - row["min_q_c_2y"])) * 100)
+            nc_index_2y = round(((q_nc - row["min_q_nc_2y"]) / (row["max_q_nc_2y"] - row["min_q_nc_2y"])) * 100)
+            nr_index_2y = round(((q_nr - row["min_q_nr_2y"]) / (row["max_q_nr_2y"] - row["min_nr_c_2y"])) * 100)
 
+            c_index_3y = round(((q_c - row["min_q_c_3y"]) / (row["max_q_c_3y"] - row["min_q_c_3y"])) * 100)
+            nc_index_3y = round(((q_nc - row["min_q_nc_3y"]) / (row["max_q_nc_3y"] - row["min_q_nc_3y"])) * 100)
+            nr_index_3y = round(((q_nr - row["min_q_nr_3y"]) / (row["max_q_nr_3y"] - row["min_nr_c_3y"])) * 100)
 
-        return asset.head(1)[['market_and_exchange_names', 'lookback_(y)', 
-                              'willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index', 
-                              'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)',
-                              'commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)', 'as_of_date_in_form_yyyy_mm_dd']]
+            c_index_4y = round(((q_c - row["min_q_c_4y"]) / (row["max_q_c_4y"] - row["min_q_c_4y"])) * 100)
+            nc_index_4y = round(((q_nc - row["min_q_nc_4y"]) / (row["max_q_nc_4y"] - row["min_q_nc_4y"])) * 100)
+            nr_index_4y = round(((q_nr - row["min_q_nr_4y"]) / (row["max_q_nr_4y"] - row["min_nr_c_4y"])) * 100)
+
+            c_index_5y = round(((q_c - row["min_q_c_5y"]) / (row["max_q_c_5y"] - row["min_q_c_5y"])) * 100)
+            nc_index_5y = round(((q_nc - row["min_q_nc_5y"]) / (row["max_q_nc_5y"] - row["min_q_nc_5y"])) * 100)
+            nr_index_5y = round(((q_nr - row["min_q_nr_5y"]) / (row["max_q_nr_5y"] - row["min_nr_c_5y"])) * 100)
+
+            cursor.execute("UPDATE data_table SET c_index_0_5y = ? WHERE id = ?", (c_index_0_5y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_0_5y = ? WHERE id = ?", (nc_index_0_5y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_0_5y = ? WHERE id = ?", (nr_index_0_5y, row["id"]))
+
+            cursor.execute("UPDATE data_table SET c_index_1y = ? WHERE id = ?", (c_index_1y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_1y = ? WHERE id = ?", (nc_index_1y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_1y = ? WHERE id = ?", (nr_index_1y, row["id"]))
+
+            cursor.execute("UPDATE data_table SET c_index_2y = ? WHERE id = ?", (c_index_2y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_2y = ? WHERE id = ?", (nc_index_2y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_2y = ? WHERE id = ?", (nr_index_2y, row["id"]))
+
+            cursor.execute("UPDATE data_table SET c_index_3y = ? WHERE id = ?", (c_index_3y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_3y = ? WHERE id = ?", (nc_index_3y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_3y = ? WHERE id = ?", (nr_index_3y, row["id"]))
+
+            cursor.execute("UPDATE data_table SET c_index_4y = ? WHERE id = ?", (c_index_4y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_4y = ? WHERE id = ?", (nc_index_4y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_4y = ? WHERE id = ?", (nr_index_4y, row["id"]))
+
+            cursor.execute("UPDATE data_table SET c_index_5y = ? WHERE id = ?", (c_index_5y, row["id"]))
+            cursor.execute("UPDATE data_table SET nc_index_5y = ? WHERE id = ?", (nc_index_5y, row["id"]))
+            cursor.execute("UPDATE data_table SET nr_index_5y = ? WHERE id = ?", (nr_index_5y, row["id"]))
+
+        connection.commit()
+        connection.close()
     

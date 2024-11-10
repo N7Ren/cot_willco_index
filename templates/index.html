@@ -17,6 +17,9 @@
         .button {
             margin-right: 10px;
         }
+        .styled-table {
+            border-spacing: 20px; /* Space between cells */
+        }
         .styled-table th,
         .styled-table td {
             /* border: 1px solid white; */
@@ -34,9 +37,6 @@
         </form>
         <form method="POST" action="/indexfilter">
             <button class="button type="submit">Show potential setups</button>
-        </form>
-        <form method="POST" action="/percentchangefilter">
-            <button class="button type="submit">Show >= 5% changes</button>
         </form>
         <form method="post" action="/assetfilter">
             <label for="asset_dropdown">Select an Asset:</label>

@@ -1,79 +1,70 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for
 import pandas as pd
+import sqlite3
+from markets import markets
 from willco import WillCo
 
 app = Flask(__name__)
 
-csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
-will_co = WillCo(csv_path)
-
-markets = pd.DataFrame({
-    'contract_code': ['098662', '042601', '044601', '043602', '020601', 
-                      '232741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '102741', '122741',
-                      '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602', 
-                      '124603', '209742', '13874A', '239742', '240741', '244042', 
-                      '133741', '146021'],
-    'contract_names':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND', 
-                        'AUSTRALIAN DOLLAR', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'BRAZILIAN REAL', 'SO AFRICAN RAND', 
-                        'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
-                        'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX', 
-                        'BITCOIN', 'ETHER CASH SETTLED']
-})
+db_path = os.path.join(os.path.dirname(__file__), "cot.db")
+will_co = WillCo(db_path)
 
 def color_index(val, column):
     if val <= 5 or val >= 95:
-        if column == 'willco_commercials_index':
+        if column == 'c_index_0_5y' or 'c_index_1y' or 'c_index_2y' or 'c_index_3y' or 'c_index_4y' or 'c_index_5y':
             return 'color: red'
-        elif column == 'willco_large_specs_index':
+        elif column == 'nc_index_0_5y' or 'nc_index_1y' or 'nc_index_2y' or 'nc_index_3y' or 'nc_index_4y' or 'nc_index_5y':
             return 'color: #3498db'
-        elif column == 'willco_small_specs_index':
+        elif column == 'nr_index_0_5y' or 'nr_index_1y' or 'nr_index_2y' or 'nr_index_3y' or 'nr_index_4y' or 'nr_index_5y':
             return 'color: yellow'
     return 'color: white'
 
-def color_percent(val, column):
-    if column == 'commercials_net_(%)' or 'large_speculators_net_(%)' or 'small_speculators_net_(%)' or 'commercials_change_(%)' or 'large_speculators_change_(%)' or 'small_speculators_change_(%)':
-        if val < 0:
-            return 'color: red'
-        elif val > 0:
-            return 'color: green'
-    return 'color: white'
-
 def generateTable(filter, selected_name=None):
-    csv_df = will_co.read_csv()
-    
+    connection = sqlite3.connect(db_path)
     result = pd.DataFrame()
 
     for market in list(markets['contract_code']):
-        df = will_co.calculateWillCo(csv_df, market, 26)
+        query = """SELECT market_and_exchange_names, c_index_0_5y, nc_index_0_5y, nr_index_0_5y, c_index_1y, nc_index_1y, nr_index_1y, c_index_2y, nc_index_2y, nr_index_2y, 
+        c_index_3y, nc_index_3y, nr_index_3y, c_index_4y, nc_index_4y, nr_index_4y, c_index_5y, nc_index_5y, nr_index_5y, as_of_date_in_form_yyyy_mm_dd
+        FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc LIMIT 1"""
+        df = pd.read_sql_query(query, connection, params=(market,))
         result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 52)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 104)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 156)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 208)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 260)
-        result = pd.concat([result, df], ignore_index=True)
-        
-    if filter == 1:
-        result = result[(result['willco_commercials_index'] >= 95) | (result['willco_commercials_index'] <= 5) | ((result['willco_large_specs_index'] >= 95) | (result['willco_large_specs_index'] <= 5)) | ((result['willco_small_specs_index'] >= 95) | (result['willco_small_specs_index'] <= 5))]
-    elif filter == 2:
-        result = result[(result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5) | ((result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)) | ((result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5))]
-    elif filter == 3:
-        result = result[result['market_and_exchange_names'] == selected_name]
+    
+    connection.close()
 
-    styled_df = result.style.map(lambda val: color_index(val, 'willco_commercials_index'), subset='willco_commercials_index')\
-                        .map(lambda val: color_index(val, 'willco_large_specs_index'), subset='willco_large_specs_index')\
-                        .map(lambda val: color_index(val, 'willco_small_specs_index'), subset='willco_small_specs_index')\
-                        .map(lambda val: color_percent(val, 'commercials_net_(%)'), subset='commercials_net_(%)')\
-                        .map(lambda val: color_percent(val, 'large_speculators_net_(%)'), subset='large_speculators_net_(%)')\
-                        .map(lambda val: color_percent(val, 'small_speculators_net_(%)'), subset='small_speculators_net_(%)')\
-                        .map(lambda val: color_percent(val, 'commercials_change_(%)'), subset='commercials_change_(%)')\
-                        .map(lambda val: color_percent(val, 'large_speculators_change_(%)'), subset='large_speculators_change_(%)')\
-                        .map(lambda val: color_percent(val, 'small_speculators_change_(%)'), subset='small_speculators_change_(%)')
+    if filter == 1:
+        result = result[(result['willco_commercials_index_0_5y'] >= 95) | (result['willco_commercials_index_0_5y'] <= 5) | 
+                        ((result['willco_large_specs_index_0_5y'] >= 95) | (result['willco_large_specs_index_0_5y'] <= 5)) | 
+                        ((result['willco_small_specs_index_0_5y'] >= 95) | (result['willco_small_specs_index_0_5y'] <= 5)) | 
+                        (result['willco_commercials_index_1y'] >= 95) | (result['willco_commercials_index_1y'] <= 5) | 
+                        ((result['willco_large_specs_index_1y'] >= 95) | (result['willco_large_specs_index_1y'] <= 5)) | 
+                        ((result['willco_small_specs_index_1y'] >= 95) | (result['willco_small_specs_index_1y'] <= 5))
+                        ]
+    elif filter == 2:
+        query = """SELECT market_and_exchange_names, c_index_0_5y, nc_index_0_5y, nr_index_0_5y, c_index_1y, nc_index_1y, nr_index_1y, c_index_2y, nc_index_2y, nr_index_2y, 
+        c_index_3y, nc_index_3y, nr_index_3y, c_index_4y, nc_index_4y, nr_index_4y, c_index_5y, nc_index_5y, nr_index_5y, as_of_date_in_form_yyyy_mm_dd
+        FROM cot_table WHERE market_and_exchange_names = ? ORDER BY id desc"""
+        result = pd.read_sql_query(query, connection, params=(selected_name,))
+
+    styled_df = result.style.map(lambda val: color_index(val, 'c_index_0_5y'), subset='c_index_0_5y')\
+                        .map(lambda val: color_index(val, 'nc_index_0_5y'), subset='nc_index_0_5y')\
+                        .map(lambda val: color_index(val, 'nr_index_0_5y'), subset='nr_index_0_5y')\
+                        .map(lambda val: color_index(val, 'c_index_1y'), subset='c_index_1y')\
+                        .map(lambda val: color_index(val, 'nc_index_1y'), subset='nc_index_1y')\
+                        .map(lambda val: color_index(val, 'nr_index_1y'), subset='nr_index_1y')\
+                        .map(lambda val: color_index(val, 'c_index_2y'), subset='c_index_2y')\
+                        .map(lambda val: color_index(val, 'nc_index_2y'), subset='nc_index_2y')\
+                        .map(lambda val: color_index(val, 'nr_index_2y'), subset='nr_index_2y')\
+                        .map(lambda val: color_index(val, 'c_index_3y'), subset='c_index_3y')\
+                        .map(lambda val: color_index(val, 'nc_index_3y'), subset='nc_index_3y')\
+                        .map(lambda val: color_index(val, 'nr_index_3y'), subset='nr_index_3y')\
+                        .map(lambda val: color_index(val, 'c_index_4y'), subset='c_index_4y')\
+                        .map(lambda val: color_index(val, 'nc_index_4y'), subset='nc_index_4y')\
+                        .map(lambda val: color_index(val, 'nr_index_4y'), subset='nr_index_4y')\
+                        .map(lambda val: color_index(val, 'c_index_5y'), subset='c_index_5y')\
+                        .map(lambda val: color_index(val, 'nc_index_5y'), subset='nc_index_5y')\
+                        .map(lambda val: color_index(val, 'nr_index_5y'), subset='nr_index_5y')
 
     styled_html = styled_df.to_html(escape=False, index=False, classes='styled-table table table-bordered table-hover')
 
@@ -87,20 +78,17 @@ def index():
 @app.route('/fetch_and_store', methods=['POST'])
 def store_data():
     will_co.fetch_and_store_cot_data()
+    will_co.calculateWillCo(markets);
     return redirect('/')
 
 @app.route('/indexfilter', methods=['POST'])
 def indexfilter():
     return render_template('index.html', table_html=generateTable(1))
 
-@app.route('/percentchangefilter', methods=['POST'])
-def percentchangefilter():
-    return render_template('index.html', table_html=generateTable(2))
-
 @app.route('/assetfilter', methods=['POST'])
 def assetfilter():
     selected_name = request.form.get('asset_dropdown')
-    return render_template('index.html', table_html=generateTable(3, selected_name))
+    return render_template('index.html', table_html=generateTable(2, selected_name))
 
 @app.route('/nofilter', methods=['POST'])
 def nofilter():
