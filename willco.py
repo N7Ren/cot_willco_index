@@ -18,7 +18,7 @@ class WillCo:
         begin_year = 2017
         end_year = 2024
 
-        for i in range(begin_year, end_year + 1):
+        for i in reversed(range(begin_year, end_year + 1)):
             single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut')) 
             df = pd.concat([df, single_year], ignore_index=True)
 
@@ -135,16 +135,17 @@ class WillCo:
             self.calculateWillCoMinMax(market, 208)
             self.calculateWillCoMinMax(market, 260)
 
-        self.calculateWillCoIndex(market)
+            self.calculateWillCoIndex(market)
 
 
     def calculateWillCoMinMax(self, market, weeks):
         connection = sqlite3.connect(self.db_path)
         cursor = connection.cursor()
 
-        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc", connection, params=(market,))
+        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id", connection, params=(market,))
 
         for i in range(len(df) - weeks + 1):
+            print(market)
             print(i)
 
             c_min_val = df['q_commercials'].iloc[i:i + weeks].min()
@@ -172,7 +173,7 @@ class WillCo:
             elif weeks == 104:
                 df.at[i, 'min_q_c_2y'] = c_min_val
                 df.at[i, 'min_q_nc_2y'] = nc_min_val
-                df.at[i, 'min_q_nr_2y'] = nr_max_val
+                df.at[i, 'min_q_nr_2y'] = nr_min_val
                 df.at[i, 'max_q_c_2y'] = c_max_val
                 df.at[i, 'max_q_nc_2y'] = nc_max_val
                 df.at[i, 'max_q_nr_2y'] = nr_max_val
@@ -250,63 +251,130 @@ class WillCo:
         connection.row_factory = sqlite3.Row
         cursor = connection.cursor()
 
-        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc", connection, params=(market,))
+        cursor.execute("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id", (market,))
         rows = cursor.fetchall()
-
-        q_c = rows[0]['q_commercials'];
-        q_nc = rows[0]['q_large_speculators'];
-        q_nr = rows[0]['q_small_speculators'];
+        
+        q_c = rows[0]['q_commercials']
+        q_nc = rows[0]['q_large_speculators']
+        q_nr = rows[0]['q_small_speculators']
 
         for row in rows:
-            print(row)
+            print(row["id"])
+            print(row["cftc_contract_market_code"])
 
-            c_index_0_5y = round(((q_c - row["min_q_c_0_5y"]) / (row["max_q_c_0_5y"] - row["min_q_c_0_5y"])) * 100)
-            nc_index_0_5y = round(((q_nc - row["min_q_nc_0_5y"]) / (row["max_q_nc_0_5y"] - row["min_q_nc_0_5y"])) * 100)
-            nr_index_0_5y = round(((q_nr - row["min_q_nr_0_5y"]) / (row["max_q_nr_0_5y"] - row["min_nr_c_0_5y"])) * 100)
+            try:
+                c_index_0_5y = round(((q_c - row["min_q_c_0_5y"]) / (row["max_q_c_0_5y"] - row["min_q_c_0_5y"])) * 100)
+            except ZeroDivisionError:
+                c_index_0_5y = -1
+            
+            try:
+                nc_index_0_5y = round(((q_nc - row["min_q_nc_0_5y"]) / (row["max_q_nc_0_5y"] - row["min_q_nc_0_5y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_0_5y = -1
+            
+            try:
+                nr_index_0_5y = round(((q_nr - row["min_q_nr_0_5y"]) / (row["max_q_nr_0_5y"] - row["min_q_nr_0_5y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_0_5y = -1
 
-            c_index_1y = round(((q_c - row["min_q_c_1y"]) / (row["max_q_c_1y"] - row["min_q_c_1y"])) * 100)
-            nc_index_1y = round(((q_nc - row["min_q_nc_1y"]) / (row["max_q_nc_1y"] - row["min_q_nc_1y"])) * 100)
-            nr_index_1y = round(((q_nr - row["min_q_nr_1y"]) / (row["max_q_nr_1y"] - row["min_nr_c_1y"])) * 100)
+            try:
+                c_index_1y = round(((q_c - row["min_q_c_1y"]) / (row["max_q_c_1y"] - row["min_q_c_1y"])) * 100)
+            except ZeroDivisionError:
+                c_index_1y = -1
+            
+            try:
+                nc_index_1y = round(((q_nc - row["min_q_nc_1y"]) / (row["max_q_nc_1y"] - row["min_q_nc_1y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_1y = -1
+            
+            try:
+                nr_index_1y = round(((q_nr - row["min_q_nr_1y"]) / (row["max_q_nr_1y"] - row["min_q_nr_1y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_1y = -1
+            
+            try:
+                c_index_2y = round(((q_c - row["min_q_c_2y"]) / (row["max_q_c_2y"] - row["min_q_c_2y"])) * 100)
+            except ZeroDivisionError:
+                c_index_2y = -1
+            
+            try:
+                nc_index_2y = round(((q_nc - row["min_q_nc_2y"]) / (row["max_q_nc_2y"] - row["min_q_nc_2y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_2y = -1
+            
+            try:
+                nr_index_2y = round(((q_nr - row["min_q_nr_2y"]) / (row["max_q_nr_2y"] - row["min_q_nr_2y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_2y = -1
 
-            c_index_2y = round(((q_c - row["min_q_c_2y"]) / (row["max_q_c_2y"] - row["min_q_c_2y"])) * 100)
-            nc_index_2y = round(((q_nc - row["min_q_nc_2y"]) / (row["max_q_nc_2y"] - row["min_q_nc_2y"])) * 100)
-            nr_index_2y = round(((q_nr - row["min_q_nr_2y"]) / (row["max_q_nr_2y"] - row["min_nr_c_2y"])) * 100)
+            try:
+                c_index_3y = round(((q_c - row["min_q_c_3y"]) / (row["max_q_c_3y"] - row["min_q_c_3y"])) * 100)
+            except ZeroDivisionError:
+                c_index_3y = -1
+            
+            try:
+                nc_index_3y = round(((q_nc - row["min_q_nc_3y"]) / (row["max_q_nc_3y"] - row["min_q_nc_3y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_3y = -1
+            
+            try:
+                nr_index_3y = round(((q_nr - row["min_q_nr_3y"]) / (row["max_q_nr_3y"] - row["min_q_nr_3y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_3y = -1
 
-            c_index_3y = round(((q_c - row["min_q_c_3y"]) / (row["max_q_c_3y"] - row["min_q_c_3y"])) * 100)
-            nc_index_3y = round(((q_nc - row["min_q_nc_3y"]) / (row["max_q_nc_3y"] - row["min_q_nc_3y"])) * 100)
-            nr_index_3y = round(((q_nr - row["min_q_nr_3y"]) / (row["max_q_nr_3y"] - row["min_nr_c_3y"])) * 100)
+            try:
+                c_index_4y = round(((q_c - row["min_q_c_4y"]) / (row["max_q_c_4y"] - row["min_q_c_4y"])) * 100)
+            except ZeroDivisionError:
+                c_index_4y = -1
+            
+            try:
+                nc_index_4y = round(((q_nc - row["min_q_nc_4y"]) / (row["max_q_nc_4y"] - row["min_q_nc_4y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_4y = -1
+            
+            try:
+                nr_index_4y = round(((q_nr - row["min_q_nr_4y"]) / (row["max_q_nr_4y"] - row["min_q_nr_4y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_4y = -1
 
-            c_index_4y = round(((q_c - row["min_q_c_4y"]) / (row["max_q_c_4y"] - row["min_q_c_4y"])) * 100)
-            nc_index_4y = round(((q_nc - row["min_q_nc_4y"]) / (row["max_q_nc_4y"] - row["min_q_nc_4y"])) * 100)
-            nr_index_4y = round(((q_nr - row["min_q_nr_4y"]) / (row["max_q_nr_4y"] - row["min_nr_c_4y"])) * 100)
+            try:
+                c_index_5y = round(((q_c - row["min_q_c_5y"]) / (row["max_q_c_5y"] - row["min_q_c_5y"])) * 100)
+            except ZeroDivisionError:
+                c_index_5y = -1
 
-            c_index_5y = round(((q_c - row["min_q_c_5y"]) / (row["max_q_c_5y"] - row["min_q_c_5y"])) * 100)
-            nc_index_5y = round(((q_nc - row["min_q_nc_5y"]) / (row["max_q_nc_5y"] - row["min_q_nc_5y"])) * 100)
-            nr_index_5y = round(((q_nr - row["min_q_nr_5y"]) / (row["max_q_nr_5y"] - row["min_nr_c_5y"])) * 100)
+            try:
+                nc_index_5y = round(((q_nc - row["min_q_nc_5y"]) / (row["max_q_nc_5y"] - row["min_q_nc_5y"])) * 100)
+            except ZeroDivisionError:
+                nc_index_5y = -1
+            
+            try:
+                nr_index_5y = round(((q_nr - row["min_q_nr_5y"]) / (row["max_q_nr_5y"] - row["min_q_nr_5y"])) * 100)
+            except ZeroDivisionError:
+                nr_index_5y = -1
 
-            cursor.execute("UPDATE data_table SET c_index_0_5y = ? WHERE id = ?", (c_index_0_5y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_0_5y = ? WHERE id = ?", (nc_index_0_5y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_0_5y = ? WHERE id = ?", (nr_index_0_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_0_5y = ? WHERE id = ?", (c_index_0_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_0_5y = ? WHERE id = ?", (nc_index_0_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_0_5y = ? WHERE id = ?", (nr_index_0_5y, row["id"]))
 
-            cursor.execute("UPDATE data_table SET c_index_1y = ? WHERE id = ?", (c_index_1y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_1y = ? WHERE id = ?", (nc_index_1y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_1y = ? WHERE id = ?", (nr_index_1y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_1y = ? WHERE id = ?", (c_index_1y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_1y = ? WHERE id = ?", (nc_index_1y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_1y = ? WHERE id = ?", (nr_index_1y, row["id"]))
 
-            cursor.execute("UPDATE data_table SET c_index_2y = ? WHERE id = ?", (c_index_2y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_2y = ? WHERE id = ?", (nc_index_2y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_2y = ? WHERE id = ?", (nr_index_2y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_2y = ? WHERE id = ?", (c_index_2y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_2y = ? WHERE id = ?", (nc_index_2y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_2y = ? WHERE id = ?", (nr_index_2y, row["id"]))
 
-            cursor.execute("UPDATE data_table SET c_index_3y = ? WHERE id = ?", (c_index_3y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_3y = ? WHERE id = ?", (nc_index_3y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_3y = ? WHERE id = ?", (nr_index_3y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_3y = ? WHERE id = ?", (c_index_3y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_3y = ? WHERE id = ?", (nc_index_3y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_3y = ? WHERE id = ?", (nr_index_3y, row["id"]))
 
-            cursor.execute("UPDATE data_table SET c_index_4y = ? WHERE id = ?", (c_index_4y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_4y = ? WHERE id = ?", (nc_index_4y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_4y = ? WHERE id = ?", (nr_index_4y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_4y = ? WHERE id = ?", (c_index_4y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_4y = ? WHERE id = ?", (nc_index_4y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_4y = ? WHERE id = ?", (nr_index_4y, row["id"]))
 
-            cursor.execute("UPDATE data_table SET c_index_5y = ? WHERE id = ?", (c_index_5y, row["id"]))
-            cursor.execute("UPDATE data_table SET nc_index_5y = ? WHERE id = ?", (nc_index_5y, row["id"]))
-            cursor.execute("UPDATE data_table SET nr_index_5y = ? WHERE id = ?", (nr_index_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET c_index_5y = ? WHERE id = ?", (c_index_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nc_index_5y = ? WHERE id = ?", (nc_index_5y, row["id"]))
+            cursor.execute("UPDATE cot_table SET nr_index_5y = ? WHERE id = ?", (nr_index_5y, row["id"]))
 
         connection.commit()
         connection.close()

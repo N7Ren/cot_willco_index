@@ -11,12 +11,12 @@ db_path = os.path.join(os.path.dirname(__file__), "cot.db")
 will_co = WillCo(db_path)
 
 def color_index(val, column):
-    if val <= 5 or val >= 95:
-        if column == 'c_index_0_5y' or 'c_index_1y' or 'c_index_2y' or 'c_index_3y' or 'c_index_4y' or 'c_index_5y':
+    if (val <= 5 and val >= 0) or val >= 95:
+        if column == 'c_index_0_5y' or column == 'c_index_1y' or column == 'c_index_2y' or column == 'c_index_3y' or column == 'c_index_4y' or column == 'c_index_5y':
             return 'color: red'
-        elif column == 'nc_index_0_5y' or 'nc_index_1y' or 'nc_index_2y' or 'nc_index_3y' or 'nc_index_4y' or 'nc_index_5y':
+        elif column == 'nc_index_0_5y' or column == 'nc_index_1y' or column == 'nc_index_2y' or column == 'nc_index_3y' or column == 'nc_index_4y' or column == 'nc_index_5y':
             return 'color: #3498db'
-        elif column == 'nr_index_0_5y' or 'nr_index_1y' or 'nr_index_2y' or 'nr_index_3y' or 'nr_index_4y' or 'nr_index_5y':
+        elif column == 'nr_index_0_5y' or column == 'nr_index_1y' or column == 'nr_index_2y' or column == 'nr_index_3y' or column == 'nr_index_4y' or column == 'nr_index_5y':
             return 'color: yellow'
     return 'color: white'
 
@@ -27,11 +27,9 @@ def generateTable(filter, selected_name=None):
     for market in list(markets['contract_code']):
         query = """SELECT market_and_exchange_names, c_index_0_5y, nc_index_0_5y, nr_index_0_5y, c_index_1y, nc_index_1y, nr_index_1y, c_index_2y, nc_index_2y, nr_index_2y, 
         c_index_3y, nc_index_3y, nr_index_3y, c_index_4y, nc_index_4y, nr_index_4y, c_index_5y, nc_index_5y, nr_index_5y, as_of_date_in_form_yyyy_mm_dd
-        FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id desc LIMIT 1"""
+        FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id LIMIT 1"""
         df = pd.read_sql_query(query, connection, params=(market,))
         result = pd.concat([result, df], ignore_index=True)
-    
-    connection.close()
 
     if filter == 1:
         result = result[(result['willco_commercials_index_0_5y'] >= 95) | (result['willco_commercials_index_0_5y'] <= 5) | 
@@ -44,8 +42,10 @@ def generateTable(filter, selected_name=None):
     elif filter == 2:
         query = """SELECT market_and_exchange_names, c_index_0_5y, nc_index_0_5y, nr_index_0_5y, c_index_1y, nc_index_1y, nr_index_1y, c_index_2y, nc_index_2y, nr_index_2y, 
         c_index_3y, nc_index_3y, nr_index_3y, c_index_4y, nc_index_4y, nr_index_4y, c_index_5y, nc_index_5y, nr_index_5y, as_of_date_in_form_yyyy_mm_dd
-        FROM cot_table WHERE market_and_exchange_names = ? ORDER BY id desc"""
+        FROM cot_table WHERE market_and_exchange_names = ? ORDER BY id"""
         result = pd.read_sql_query(query, connection, params=(selected_name,))
+
+    connection.close()
 
     styled_df = result.style.map(lambda val: color_index(val, 'c_index_0_5y'), subset='c_index_0_5y')\
                         .map(lambda val: color_index(val, 'nc_index_0_5y'), subset='nc_index_0_5y')\
