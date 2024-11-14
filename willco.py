@@ -96,29 +96,29 @@ class WillCo:
         df['min_q_nr_5y'] = 0.0
         df['max_q_nr_5y'] = 0.0
 
-        df['c_index_0_5y'] = -1
-        df['nc_index_0_5y'] = -1
-        df['nr_index_0_5y'] = -1
+        df['c_index_0_5y'] = -1.0
+        df['nc_index_0_5y'] = -1.0
+        df['nr_index_0_5y'] = -1.0
 
-        df['c_index_1y'] = -1
-        df['nc_index_1y'] = -1
-        df['nr_index_1y'] = -1
+        df['c_index_1y'] = -1.0
+        df['nc_index_1y'] = -1.0
+        df['nr_index_1y'] = -1.0
 
-        df['c_index_2y'] = -1
-        df['nc_index_2y'] = -1
-        df['nr_index_2y'] = -1
+        df['c_index_2y'] = -1.0
+        df['nc_index_2y'] = -1.0
+        df['nr_index_2y'] = -1.0
 
-        df['c_index_3y'] = -1
-        df['nc_index_3y'] = -1
-        df['nr_index_3y'] = -1
+        df['c_index_3y'] = -1.0
+        df['nc_index_3y'] = -1.0
+        df['nr_index_3y'] = -1.0
 
-        df['c_index_4y'] = -1
-        df['nc_index_4y'] = -1
-        df['nr_index_4y'] = -1
+        df['c_index_4y'] = -1.0
+        df['nc_index_4y'] = -1.0
+        df['nr_index_4y'] = -1.0
 
-        df['c_index_5y'] = -1
-        df['nc_index_5y'] = -1
-        df['nr_index_5y'] = -1
+        df['c_index_5y'] = -1.0
+        df['nc_index_5y'] = -1.0
+        df['nr_index_5y'] = -1.0
 
 
         connection = sqlite3.connect(self.db_path)
@@ -139,112 +139,64 @@ class WillCo:
 
 
     def calculateWillCoMinMax(self, market, weeks):
-        connection = sqlite3.connect(self.db_path)
-        cursor = connection.cursor()
+        try:
+            connection = sqlite3.connect(self.db_path)
+            cursor = connection.cursor()
 
-        df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id", connection, params=(market,))
+            # Load data into DataFrame
+            df = pd.read_sql_query("SELECT * FROM cot_table WHERE cftc_contract_market_code = ? ORDER BY id", connection, params=(market,))
 
-        for i in range(len(df) - weeks + 1):
-            print(market)
-            print(i)
+            # Calculate rolling min and max values for each column
+            df['min_q_commercials'] = df['q_commercials'].rolling(window=weeks, min_periods=1).min()
+            df['max_q_commercials'] = df['q_commercials'].rolling(window=weeks, min_periods=1).max()
+            df['min_q_large_speculators'] = df['q_large_speculators'].rolling(window=weeks, min_periods=1).min()
+            df['max_q_large_speculators'] = df['q_large_speculators'].rolling(window=weeks, min_periods=1).max()
+            df['min_q_small_speculators'] = df['q_small_speculators'].rolling(window=weeks, min_periods=1).min()
+            df['max_q_small_speculators'] = df['q_small_speculators'].rolling(window=weeks, min_periods=1).max()
 
-            c_min_val = df['q_commercials'].iloc[i:i + weeks].min()
-            nc_min_val = df['q_large_speculators'].iloc[i:i + weeks].min()
-            nr_min_val = df['q_small_speculators'].iloc[i:i + weeks].min()
-
-            c_max_val = df['q_commercials'].iloc[i:i + weeks].max()
-            nc_max_val = df['q_large_speculators'].iloc[i:i + weeks].max()
-            nr_max_val = df['q_small_speculators'].iloc[i:i + weeks].max()
-
-            if weeks == 26:
-                df.at[i, 'min_q_c_0_5y'] = c_min_val
-                df.at[i, 'min_q_nc_0_5y'] = nc_min_val
-                df.at[i, 'min_q_nr_0_5y'] = nr_min_val
-                df.at[i, 'max_q_c_0_5y'] = c_max_val
-                df.at[i, 'max_q_nc_0_5y'] = nc_max_val
-                df.at[i, 'max_q_nr_0_5y'] = nr_max_val
-            elif weeks == 52:
-                df.at[i, 'min_q_c_1y'] = c_min_val
-                df.at[i, 'min_q_nc_1y'] = nc_min_val
-                df.at[i, 'min_q_nr_1y'] = nr_min_val
-                df.at[i, 'max_q_c_1y'] = c_max_val
-                df.at[i, 'max_q_nc_1y'] = nc_max_val
-                df.at[i, 'max_q_nr_1y'] = nr_max_val
-            elif weeks == 104:
-                df.at[i, 'min_q_c_2y'] = c_min_val
-                df.at[i, 'min_q_nc_2y'] = nc_min_val
-                df.at[i, 'min_q_nr_2y'] = nr_min_val
-                df.at[i, 'max_q_c_2y'] = c_max_val
-                df.at[i, 'max_q_nc_2y'] = nc_max_val
-                df.at[i, 'max_q_nr_2y'] = nr_max_val
-            elif weeks == 156:
-                df.at[i, 'min_q_c_3y'] = c_min_val
-                df.at[i, 'min_q_nc_3y'] = nc_min_val
-                df.at[i, 'min_q_nr_3y'] = nr_min_val
-                df.at[i, 'max_q_c_3y'] = c_max_val
-                df.at[i, 'max_q_nc_3y'] = nc_max_val
-                df.at[i, 'max_q_nr_3y'] = nr_max_val
-            elif weeks == 208:
-                df.at[i, 'min_q_c_4y'] = c_min_val
-                df.at[i, 'min_q_nc_4y'] = nc_min_val
-                df.at[i, 'min_q_nr_4y'] = nr_min_val
-                df.at[i, 'max_q_c_4y'] = c_max_val
-                df.at[i, 'max_q_nc_4y'] = nc_max_val
-                df.at[i, 'max_q_nr_4y'] = nr_max_val
-            elif weeks == 260:
-                df.at[i, 'min_q_c_5y'] = c_min_val
-                df.at[i, 'min_q_nc_5y'] = nc_min_val
-                df.at[i, 'min_q_nr_5y'] = nr_min_val
-                df.at[i, 'max_q_c_5y'] = c_max_val
-                df.at[i, 'max_q_nc_5y'] = nc_max_val
-                df.at[i, 'max_q_nr_5y'] = nr_max_val
-
+            # Now, iterate over each row and update only relevant columns
             for i, row in df.iterrows():
+                print(f"Updating row {i} with id={row['id']} for market {market}")
+
                 if weeks == 26:
-                    cursor.execute("UPDATE cot_table SET min_q_c_0_5y = ? WHERE id = ?", (row['min_q_c_0_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_0_5y = ? WHERE id = ?", (row['min_q_nc_0_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_0_5y = ? WHERE id = ?", (row['min_q_nr_0_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_0_5y = ? WHERE id = ?", (row['max_q_c_0_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_0_5y = ? WHERE id = ?", (row['max_q_nc_0_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_0_5y = ? WHERE id = ?", (row['max_q_nr_0_5y'], row['id']))
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_0_5y = ?, max_q_c_0_5y = ?, min_q_nc_0_5y = ?, max_q_nc_0_5y = ?, min_q_nr_0_5y = ?, max_q_nr_0_5y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )
                 elif weeks == 52:
-                    cursor.execute("UPDATE cot_table SET min_q_c_1y = ? WHERE id = ?", (row['min_q_c_1y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_1y = ? WHERE id = ?", (row['min_q_nc_1y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_1y = ? WHERE id = ?", (row['min_q_nr_1y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_1y = ? WHERE id = ?", (row['max_q_c_1y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_1y = ? WHERE id = ?", (row['max_q_nc_1y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_1y = ? WHERE id = ?", (row['max_q_nr_1y'], row['id']))
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_1y = ?, max_q_c_1y = ?, min_q_nc_1y = ?, max_q_nc_1y = ?, min_q_nr_1y = ?, max_q_nr_1y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )
                 elif weeks == 104:
-                    cursor.execute("UPDATE cot_table SET min_q_c_2y = ? WHERE id = ?", (row['min_q_c_2y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_2y = ? WHERE id = ?", (row['min_q_nc_2y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_2y = ? WHERE id = ?", (row['min_q_nr_2y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_2y = ? WHERE id = ?", (row['max_q_c_2y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_2y = ? WHERE id = ?", (row['max_q_nc_2y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_2y = ? WHERE id = ?", (row['max_q_nr_2y'], row['id']))
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_2y = ?, max_q_c_2y = ?, min_q_nc_2y = ?, max_q_nc_2y = ?, min_q_nr_2y = ?, max_q_nr_2y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )  
                 elif weeks == 156:
-                    cursor.execute("UPDATE cot_table SET min_q_c_3y = ? WHERE id = ?", (row['min_q_c_3y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_3y = ? WHERE id = ?", (row['min_q_nc_3y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_3y = ? WHERE id = ?", (row['min_q_nr_3y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_3y = ? WHERE id = ?", (row['max_q_c_3y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_3y = ? WHERE id = ?", (row['max_q_nc_3y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_3y = ? WHERE id = ?", (row['max_q_nr_3y'], row['id']))
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_3y = ?, max_q_c_3y = ?, min_q_nc_3y = ?, max_q_nc_3y = ?, min_q_nr_3y = ?, max_q_nr_3y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )
                 elif weeks == 208:
-                    cursor.execute("UPDATE cot_table SET min_q_c_4y = ? WHERE id = ?", (row['min_q_c_4y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_4y = ? WHERE id = ?", (row['min_q_nc_4y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_4y = ? WHERE id = ?", (row['min_q_nr_4y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_4y = ? WHERE id = ?", (row['max_q_c_4y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_4y = ? WHERE id = ?", (row['max_q_nc_4y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_4y = ? WHERE id = ?", (row['max_q_nr_4y'], row['id']))
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_4y = ?, max_q_c_4y = ?, min_q_nc_4y = ?, max_q_nc_4y = ?, min_q_nr_4y = ?, max_q_nr_4y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )
                 elif weeks == 260:
-                    cursor.execute("UPDATE cot_table SET min_q_c_5y = ? WHERE id = ?", (row['min_q_c_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nc_5y = ? WHERE id = ?", (row['min_q_nc_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET min_q_nr_5y = ? WHERE id = ?", (row['min_q_nr_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_c_5y = ? WHERE id = ?", (row['max_q_c_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nc_5y = ? WHERE id = ?", (row['max_q_nc_5y'], row['id']))
-                    cursor.execute("UPDATE cot_table SET max_q_nr_5y = ? WHERE id = ?", (row['max_q_nr_5y'], row['id']))
-            
-        connection.commit()
-        connection.close()
+                    cursor.execute(
+                        "UPDATE cot_table SET min_q_c_5y = ?, max_q_c_5y = ?, min_q_nc_5y = ?, max_q_nc_5y = ?, min_q_nr_5y = ?, max_q_nr_5y = ? WHERE id = ?",
+                        (row['min_q_commercials'], row['max_q_commercials'], row['min_q_large_speculators'], row['max_q_large_speculators'], row['min_q_small_speculators'], row['max_q_small_speculators'], row['id'])
+                    )
+
+            # Commit all updates once outside the loop
+            connection.commit()
+
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+        finally:
+            if connection:
+                connection.close()
 
     def calculateWillCoIndex(self, market):
         connection = sqlite3.connect(self.db_path)
@@ -259,8 +211,14 @@ class WillCo:
         q_nr = rows[0]['q_small_speculators']
 
         for row in rows:
-            print(row["id"])
-            print(row["cftc_contract_market_code"])
+            q_min = row["min_q_c_0_5y"]
+            q_max = row["min_q_c_0_5y"]
+            id = row["id"]
+
+            try:
+                print(f"Row {id}: q_commercials {q_c}, min = {q_min}, max = {q_max}, zeahler = {q_c - q_min}, nenner = {q_max - q_min}, result = {(q_c - q_min) / (q_max - q_min)}")
+            except ZeroDivisionError:
+                print(f"Row {id}: zerodiv")
 
             try:
                 c_index_0_5y = round(((q_c - row["min_q_c_0_5y"]) / (row["max_q_c_0_5y"] - row["min_q_c_0_5y"])) * 100)
@@ -352,6 +310,8 @@ class WillCo:
             except ZeroDivisionError:
                 nr_index_5y = -1
 
+
+            print(f"Row {id}: {c_index_0_5y}:")
             cursor.execute("UPDATE cot_table SET c_index_0_5y = ? WHERE id = ?", (c_index_0_5y, row["id"]))
             cursor.execute("UPDATE cot_table SET nc_index_0_5y = ? WHERE id = ?", (nc_index_0_5y, row["id"]))
             cursor.execute("UPDATE cot_table SET nr_index_0_5y = ? WHERE id = ?", (nr_index_0_5y, row["id"]))
