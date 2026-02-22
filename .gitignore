@@ -163,3 +163,10 @@ cython_debug/
 *.db
 *.zip
 *.db-journal
+
+# Project-specific
+cot-env/
+cot/
+_pycache_/
+annual.txt
+cot.csv
