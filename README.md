@@ -1,36 +1,58 @@
 # cot_willco_index
 
-`cot_willco_index` is a Flask + pandas project for analyzing CFTC Commitments of Traders (COT) legacy futures data and computing Williams Commercial Index-style signals.
+`cot_willco_index` is a Flask app that builds and displays Williams Commercial Index-style signals from CFTC legacy futures Commitments of Traders (COT) data.
 
-## What the project does
+## Current repository analysis
 
-- Loads (or builds) a local `cot.csv` dataset from CFTC legacy futures reports
-- Computes trader-group net positioning metrics for:
+The current codebase is a compact single-app layout with three active source files:
+
+- `index.py`: Flask routes, hard-coded market list, table generation, and UI filtering behavior
+- `willco.py`: COT data fetch/storage and WillCo metric calculation logic
+- `templates/index.html`: Bootstrap-based UI template
+
+Current tracked repo files:
+
+- `index.py`
+- `willco.py`
+- `templates/index.html`
+- `README.md`
+- `LICENSE`
+
+## Functional behavior
+
+The app:
+
+- Uses `cot_reports` to pull `legacy_fut` data
+- Persists data to local `cot.csv`
+- Calculates net exposure and WillCo-style index scores (`0-100`) for:
   - Commercials
   - Large Speculators (Non-Commercials)
   - Small Speculators (Non-Reportables)
-- Calculates Williams-style indexes (`0-100`) across these lookbacks:
+- Computes values over these lookbacks:
   - 26 weeks (0.5y)
   - 52 weeks (1y)
   - 104 weeks (2y)
   - 156 weeks (3y)
   - 208 weeks (4y)
   - 260 weeks (5y)
-- Serves a web UI with table filters for potential setups and per-asset views
+- Renders a table with color highlighting and filters
 
-## Repository structure
+## Data flow
 
-- `index.py`: Flask app entrypoint (routes, table generation, filtering, styling)
-- `willco.py`: COT data fetch/prepare logic and WillCo calculations
-- `templates/index.html`: Flask template for the table UI
-- `.gitignore`: ignores generated artifacts such as `cot.csv`, `cot/`, and local envs
-- `LICENSE`: GPL-3.0 license text
+1. `WillCo` initializes with `cot.csv` path.
+2. If `cot.csv` does not exist, it fetches roughly 7 years of COT data and writes `cot.csv`.
+3. Flask loads CSV data and computes per-market results for all lookbacks.
+4. Results are rendered in the HTML table.
 
-Common generated local artifacts:
+## Routes and UI actions
 
-- `cot.csv`: consolidated COT dataset used by the app
-- `annual.txt`: large local data artifact
-- `cot/`: per-market CSV exports from `generate_csvs.py`
+- `GET /`: full unfiltered table
+- `POST /fetch_and_store`: refresh local COT data
+- `POST /indexfilter`: show extreme index setups
+- `POST /assetfilter`: show selected asset only
+- `POST /nofilter`: clear filters and return to full table
+
+Note: `POST /percentchangefilter` exists in code but is not currently wired to a visible button in `templates/index.html`.
 
 ## Requirements
 
@@ -39,7 +61,7 @@ Common generated local artifacts:
 - `pandas`
 - `cot-reports`
 
-Example install (recommended on Debian/Ubuntu and other externally-managed Python installs):
+Recommended install (works on externally managed Python environments such as Debian/Ubuntu):
 
 ```bash
 python3 -m venv .venv
@@ -48,41 +70,20 @@ python -m pip install --upgrade pip
 python -m pip install flask pandas cot-reports
 ```
 
-## Run the web app
-
-From the repository root:
+## Run
 
 ```bash
+. .venv/bin/activate
 python index.py
 ```
 
-Then open:
+Open `http://127.0.0.1:5000`.
 
-- `http://127.0.0.1:5000`
+## Implementation notes
 
-## Data bootstrap behavior
-
-`WillCo` checks for `cot.csv` at startup.
-
-- If `cot.csv` exists, it is loaded directly.
-- If `cot.csv` is missing, the app fetches roughly the last 7 years of CFTC `legacy_fut` data and writes a new `cot.csv`.
-
-This first run requires internet access to CFTC data sources.
-
-## Utility script
-
-Generate per-market CSV snapshots:
-
-```bash
-python generate_csvs.py
-```
-
-Outputs files under `cot/` for full history and a limited year range variant per market code.
-
-## Notes
-
-- The active market universe for the web app is currently hard-coded in `index.py`.
-- Generated datasets can be large and are intentionally git-ignored.
+- Market universe is hard-coded in `index.py`.
+- `cot.csv` is expected at repository root and is generated on first run if missing.
+- The app runs with `debug=True` in `index.py`.
 
 ## License
 
