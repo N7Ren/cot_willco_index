@@ -40,12 +40,11 @@
         </form>
         <form method="post" action="/assetfilter">
             <label for="asset_dropdown">Select an Asset:</label>
-            <select name="asset_dropdown" id="asset_dropdown">
+            <select name="asset_dropdown" id="asset_dropdown" onchange="this.form.submit()">
                 {% for name in dropdown_options %}
                     <option value="{{ name }}">{{ name }}</option>
                 {% endfor %}
             </select>
-            <input type="submit" value="Filter Asset">
         </form>
         <form method="POST" action="/nofilter">
             <button class="button type="submit">Reset filter</button>

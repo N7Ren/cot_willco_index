@@ -91,16 +91,19 @@ def store_data():
 
 @app.route('/indexfilter', methods=['POST'])
 def indexfilter():
-    return render_template('index.html', table_html=generateTable(1))
+    dropdown_options = markets['contract_names']
+    return render_template('index.html', table_html=generateTable(1), dropdown_options=dropdown_options)
 
 @app.route('/percentchangefilter', methods=['POST'])
 def percentchangefilter():
-    return render_template('index.html', table_html=generateTable(2))
+    dropdown_options = markets['contract_names']
+    return render_template('index.html', table_html=generateTable(2), dropdown_options=dropdown_options)
 
 @app.route('/assetfilter', methods=['POST'])
 def assetfilter():
     selected_name = request.form.get('asset_dropdown')
-    return render_template('index.html', table_html=generateTable(3, selected_name))
+    dropdown_options = markets['contract_names']
+    return render_template('index.html', table_html=generateTable(3, selected_name), dropdown_options=dropdown_options)
 
 @app.route('/nofilter', methods=['POST'])
 def nofilter():
