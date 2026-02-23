@@ -25,6 +25,23 @@ markets = pd.DataFrame({
                         'BITCOIN', 'ETHER CASH SETTLED']
 })
 
+_cached_csv_df = None
+_cached_csv_mtime = None
+
+def get_csv_df():
+    global _cached_csv_df, _cached_csv_mtime
+    try:
+        mtime = os.path.getmtime(csv_path)
+    except OSError:
+        _cached_csv_df = None
+        _cached_csv_mtime = None
+        return will_co.read_csv()
+
+    if _cached_csv_df is None or _cached_csv_mtime != mtime:
+        _cached_csv_df = will_co.read_csv()
+        _cached_csv_mtime = mtime
+    return _cached_csv_df
+
 def clamp(value, lower, upper):
     return max(lower, min(value, upper))
 
@@ -79,7 +96,7 @@ def color_percent(val, column):
     return 'color: white'
 
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
-    csv_df = will_co.read_csv()
+    csv_df = get_csv_df()
     
     frames = []
 
