@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,58 +12,95 @@
             background-color: black;
             color: white;
         }
+
         .button-container {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
             align-items: center;
         }
+
         .button {
             margin-right: 0;
         }
+
         .styled-table {
-            border-spacing: 20px; /* Space between cells */
+            border-spacing: 20px;
+            /* Space between cells */
         }
+
         .styled-table th,
         .styled-table td {
             /* border: 1px solid white; */
             text-align: center;
             padding: 5px;
         }
+
         .controls-form {
             display: flex;
             align-items: center;
             gap: 8px;
             margin: 0;
         }
+
         .threshold-input {
             width: 80px;
         }
+
+        .nav-bar {
+            background-color: #1a1a1a;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .nav-bar a {
+            color: #ddd;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .nav-bar a:hover {
+            color: white;
+        }
+
+        .nav-bar a.active {
+            color: #007bff;
+        }
     </style>
 </head>
-<body>    
+
+<body>
+    <div class="nav-bar">
+        <a href="/" class="active">Home</a>
+        <a href="/resources">Resources</a>
+    </div>
     <h1>WillCo Index Calculations</h1>
     <div class="button-container">
-        <form class="controls-form" method="GET" action="/">
-            <input type="hidden" name="mode" value="{{ mode }}">
-            {% if mode == 'asset' and selected_asset %}
-                <input type="hidden" name="asset" value="{{ selected_asset }}">
-            {% endif %}
-            <label for="low">Low:</label>
-            <input class="threshold-input" type="number" id="low" name="low" min="0" max="100" step="1" value="{{ low }}">
-            <label for="high">High:</label>
-            <input class="threshold-input" type="number" id="high" name="high" min="0" max="100" step="1" value="{{ high }}">
-            <button class="button" type="submit">Apply</button>
-        </form>
-
         <form method="POST" action="/fetch_and_store">
             <input type="hidden" name="mode" value="{{ mode }}">
             <input type="hidden" name="low" value="{{ low }}">
             <input type="hidden" name="high" value="{{ high }}">
             {% if mode == 'asset' and selected_asset %}
-                <input type="hidden" name="asset" value="{{ selected_asset }}">
+            <input type="hidden" name="asset" value="{{ selected_asset }}">
             {% endif %}
             <button class="button" type="submit">Fetch and store COT data</button>
+        </form>
+
+        <form class="controls-form" method="GET" action="/">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            {% if mode == 'asset' and selected_asset %}
+            <input type="hidden" name="asset" value="{{ selected_asset }}">
+            {% endif %}
+            <label for="low">Low:</label>
+            <input class="threshold-input" type="number" id="low" name="low" min="0" max="100" step="1"
+                value="{{ low }}">
+            <label for="high">High:</label>
+            <input class="threshold-input" type="number" id="high" name="high" min="0" max="100" step="1"
+                value="{{ high }}">
+            <button class="button" type="submit">Apply</button>
         </form>
 
         <form class="controls-form" method="GET" action="/">
@@ -79,7 +117,7 @@
             <label for="asset_dropdown">Select an Asset:</label>
             <select name="asset" id="asset_dropdown" onchange="this.form.submit()">
                 {% for name in dropdown_options %}
-                    <option value="{{ name }}" {% if name == selected_asset %}selected{% endif %}>{{ name }}</option>
+                <option value="{{ name }}" {% if name==selected_asset %}selected{% endif %}>{{ name }}</option>
                 {% endfor %}
             </select>
         </form>
@@ -91,9 +129,10 @@
             <button class="button" type="submit">Reset filter</button>
         </form>
     </div>
-    <br/>
+    <br />
     <div class="styled-table">
         {{ table_html | safe }}
     </div>
 </body>
+
 </html>

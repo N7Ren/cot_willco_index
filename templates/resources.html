@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resources - WillCo Index</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: black;
+            color: white;
+        }
+
+        .nav-bar {
+            background-color: #1a1a1a;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .nav-bar a {
+            color: #ddd;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .nav-bar a:hover {
+            color: white;
+        }
+
+        .nav-bar a.active {
+            color: #007bff;
+        }
+
+        .container {
+            margin-top: 50px;
+        }
+
+        .resource-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .resource-item {
+            background-color: #1a1a1a;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+
+        .resource-item h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+
+        .resource-item p {
+            margin-bottom: 0;
+            color: #ccc;
+        }
+
+        .resource-item a {
+            color: #007bff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="nav-bar">
+        <a href="/">Home</a>
+        <a href="/resources" class="active">Resources</a>
+    </div>
+    <div class="container">
+        <h1>Resources</h1>
+        <p>A collection of useful references and documentation for COT and WillCo Index calculations.</p>
+
+        <ul class="resource-list">
+            <li class="resource-item">
+                <h3>CFTC COT Reports</h3>
+                <p>Official Commitments of Traders data from the CFTC website.</p>
+                <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank">View
+                    Website</a>
+            </li>
+            <li class="resource-item">
+                <h3>WillCo Index Explanation</h3>
+                <p>Reference documentation explaining the Williams Commercial Index calculation methodology.</p>
+                <a href="#">Read Documentation (Placeholder)</a>
+            </li>
+            <li class="resource-item">
+                <h3>Market Reference Guide</h3>
+                <p>List of contract codes and exchange information used in this application.</p>
+                <a href="#">View Guide (Placeholder)</a>
+            </li>
+        </ul>
+    </div>
+</body>
+
+</html>

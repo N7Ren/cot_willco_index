@@ -175,6 +175,9 @@ def nofilter():
     low, high = parse_thresholds(request.form)
     return redirect(url_for('index', mode='all', low=low, high=high))
 
+@app.route('/resources')
+def resources():
+    return render_template('resources.html')
+
 if __name__ == '__main__':
     app.run(debug=True)
-
