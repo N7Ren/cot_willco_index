@@ -27,6 +27,8 @@ markets = pd.DataFrame({
 
 _cached_csv_df = None
 _cached_csv_mtime = None
+_cached_results_df = None
+_cached_results_mtime = None
 
 def get_csv_df():
     global _cached_csv_df, _cached_csv_mtime
@@ -41,6 +43,24 @@ def get_csv_df():
         _cached_csv_df = will_co.read_csv()
         _cached_csv_mtime = mtime
     return _cached_csv_df
+
+def get_results_df():
+    global _cached_results_df, _cached_results_mtime
+    csv_df = get_csv_df()
+    csv_mtime = _cached_csv_mtime
+
+    if _cached_results_df is None or _cached_results_mtime != csv_mtime:
+        frames = []
+        for market in list(markets['contract_code']):
+            frames.append(will_co.calculateWillCo(csv_df, market, 26))
+            frames.append(will_co.calculateWillCo(csv_df, market, 52))
+            frames.append(will_co.calculateWillCo(csv_df, market, 104))
+            frames.append(will_co.calculateWillCo(csv_df, market, 156))
+            frames.append(will_co.calculateWillCo(csv_df, market, 208))
+            frames.append(will_co.calculateWillCo(csv_df, market, 260))
+        _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        _cached_results_mtime = csv_mtime
+    return _cached_results_df
 
 def clamp(value, lower, upper):
     return max(lower, min(value, upper))
@@ -96,19 +116,7 @@ def color_percent(val, column):
     return 'color: white'
 
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
-    csv_df = get_csv_df()
-    
-    frames = []
-
-    for market in list(markets['contract_code']):
-        frames.append(will_co.calculateWillCo(csv_df, market, 26))
-        frames.append(will_co.calculateWillCo(csv_df, market, 52))
-        frames.append(will_co.calculateWillCo(csv_df, market, 104))
-        frames.append(will_co.calculateWillCo(csv_df, market, 156))
-        frames.append(will_co.calculateWillCo(csv_df, market, 208))
-        frames.append(will_co.calculateWillCo(csv_df, market, 260))
-
-    result = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    result = get_results_df()
         
     if filter_mode == 'setups':
         result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
