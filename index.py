@@ -81,21 +81,17 @@ def color_percent(val, column):
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
     csv_df = will_co.read_csv()
     
-    result = pd.DataFrame()
+    frames = []
 
     for market in list(markets['contract_code']):
-        df = will_co.calculateWillCo(csv_df, market, 26)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 52)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 104)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 156)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 208)
-        result = pd.concat([result, df], ignore_index=True)
-        df = will_co.calculateWillCo(csv_df, market, 260)
-        result = pd.concat([result, df], ignore_index=True)
+        frames.append(will_co.calculateWillCo(csv_df, market, 26))
+        frames.append(will_co.calculateWillCo(csv_df, market, 52))
+        frames.append(will_co.calculateWillCo(csv_df, market, 104))
+        frames.append(will_co.calculateWillCo(csv_df, market, 156))
+        frames.append(will_co.calculateWillCo(csv_df, market, 208))
+        frames.append(will_co.calculateWillCo(csv_df, market, 260))
+
+    result = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         
     if filter_mode == 'setups':
         result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
