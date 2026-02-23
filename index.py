@@ -1,4 +1,5 @@
 import os
+from collections import OrderedDict
 from flask import Flask, render_template, request, redirect, url_for
 import pandas as pd
 from willco import WillCo
@@ -29,7 +30,8 @@ _cached_csv_df = None
 _cached_csv_mtime = None
 _cached_results_df = None
 _cached_results_mtime = None
-_cached_table_html = {}
+_cached_table_html = OrderedDict()
+MAX_TABLE_CACHE_ENTRIES = 32
 
 def get_csv_df():
     global _cached_csv_df, _cached_csv_mtime
@@ -46,7 +48,7 @@ def get_csv_df():
     return _cached_csv_df
 
 def get_results_df():
-    global _cached_results_df, _cached_results_mtime
+    global _cached_results_df, _cached_results_mtime, _cached_table_html
     csv_df = get_csv_df()
     csv_mtime = _cached_csv_mtime
 
@@ -61,6 +63,7 @@ def get_results_df():
             frames.append(will_co.calculateWillCo(csv_df, market, 260))
         _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         _cached_results_mtime = csv_mtime
+        _cached_table_html.clear()
     return _cached_results_df
 
 def clamp(value, lower, upper):
@@ -121,6 +124,7 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     cache_key = (_cached_results_mtime, filter_mode, low, high, selected_name)
     cached_html = _cached_table_html.get(cache_key)
     if cached_html is not None:
+        _cached_table_html.move_to_end(cache_key)
         return cached_html
         
     if filter_mode == 'setups':
@@ -143,6 +147,8 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     styled_html = styled_df.to_html(escape=False, index=False, classes='styled-table table table-bordered table-hover')
 
     _cached_table_html[cache_key] = styled_html
+    if len(_cached_table_html) > MAX_TABLE_CACHE_ENTRIES:
+        _cached_table_html.popitem(last=False)
     return styled_html
 
 @app.route('/')
