@@ -29,6 +29,7 @@ _cached_csv_df = None
 _cached_csv_mtime = None
 _cached_results_df = None
 _cached_results_mtime = None
+_cached_table_html = {}
 
 def get_csv_df():
     global _cached_csv_df, _cached_csv_mtime
@@ -117,6 +118,10 @@ def color_percent(val, column):
 
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
     result = get_results_df()
+    cache_key = (_cached_results_mtime, filter_mode, low, high, selected_name)
+    cached_html = _cached_table_html.get(cache_key)
+    if cached_html is not None:
+        return cached_html
         
     if filter_mode == 'setups':
         result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
@@ -137,6 +142,7 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
 
     styled_html = styled_df.to_html(escape=False, index=False, classes='styled-table table table-bordered table-hover')
 
+    _cached_table_html[cache_key] = styled_html
     return styled_html
 
 @app.route('/')
