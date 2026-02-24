@@ -5,13 +5,29 @@ import datetime
 
 class WillCo:
 
+    # Only the columns actually used by calculateWillCo()
+    REQUIRED_CSV_COLUMNS = [
+        'cftc_contract_market_code',
+        'market_and_exchange_names',
+        'as_of_date_in_form_yyyy_mm_dd',
+        'q_commercials',
+        'q_large_speculators',
+        'q_small_speculators',
+        'commercials_net_percent',
+        'large_speculators_net_percent',
+        'small_speculators_net_percent',
+        'percent_commercials_long',
+        'percent_large_speculators_long',
+        'percent_small_speculators_long',
+    ]
+
     def __init__(self, csv_path):        
         self.csv_path = csv_path
         if not os.path.exists(self.csv_path):
             self.fetch_and_store_cot_data()
 
     def read_csv(self):
-        return pd.read_csv(self.csv_path)
+        return pd.read_csv(self.csv_path, usecols=self.REQUIRED_CSV_COLUMNS)
 
     def fetch_and_store_cot_data(self):
         end_year = int(datetime.date.today().strftime('%Y')) + 1
