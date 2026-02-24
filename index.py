@@ -31,7 +31,9 @@ _cached_csv_mtime = None
 _cached_results_df = None
 _cached_results_mtime = None
 _cached_table_html = OrderedDict()
+_cached_filtered_df = OrderedDict()
 MAX_TABLE_CACHE_ENTRIES = 32
+MAX_FILTERED_CACHE_ENTRIES = 32
 
 def get_csv_df():
     global _cached_csv_df, _cached_csv_mtime
@@ -48,7 +50,7 @@ def get_csv_df():
     return _cached_csv_df
 
 def get_results_df():
-    global _cached_results_df, _cached_results_mtime, _cached_table_html
+    global _cached_results_df, _cached_results_mtime, _cached_table_html, _cached_filtered_df
     csv_df = get_csv_df()
     csv_mtime = _cached_csv_mtime
 
@@ -64,6 +66,7 @@ def get_results_df():
         _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         _cached_results_mtime = csv_mtime
         _cached_table_html.clear()
+        _cached_filtered_df.clear()
     return _cached_results_df
 
 def clamp(value, lower, upper):
@@ -126,13 +129,22 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     if cached_html is not None:
         _cached_table_html.move_to_end(cache_key)
         return cached_html
+    
+    cached_filtered = _cached_filtered_df.get(cache_key)
+    if cached_filtered is not None:
+        _cached_filtered_df.move_to_end(cache_key)
+        result = cached_filtered
+    else:
+        if filter_mode == 'setups':
+            result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
+        elif filter_mode == 'percentchange':
+            result = result[(result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5) | ((result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)) | ((result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5))]
+        elif filter_mode == 'asset':
+            result = result[result['market_and_exchange_names'] == selected_name]
         
-    if filter_mode == 'setups':
-        result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
-    elif filter_mode == 'percentchange':
-        result = result[(result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5) | ((result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)) | ((result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5))]
-    elif filter_mode == 'asset':
-        result = result[result['market_and_exchange_names'] == selected_name]
+        _cached_filtered_df[cache_key] = result.copy()
+        if len(_cached_filtered_df) > MAX_FILTERED_CACHE_ENTRIES:
+            _cached_filtered_df.popitem(last=False)
 
     styled_df = result.style.map(lambda val: color_index(val, low, high), subset='willco_commercials_index')\
                         .map(lambda val: color_index(val, low, high), subset='willco_large_specs_index')\
