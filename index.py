@@ -136,9 +136,15 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
         result = cached_filtered
     else:
         if filter_mode == 'setups':
-            result = result[(result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low) | ((result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)) | ((result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low))]
+            mask_commercial = (result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low)
+            mask_large_specs = (result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)
+            mask_small_specs = (result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low)
+            result = result[mask_commercial | mask_large_specs | mask_small_specs]
         elif filter_mode == 'percentchange':
-            result = result[(result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5) | ((result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)) | ((result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5))]
+            mask_commercials_change = (result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5)
+            mask_large_specs_change = (result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)
+            mask_small_specs_change = (result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5)
+            result = result[mask_commercials_change | mask_large_specs_change | mask_small_specs_change]
         elif filter_mode == 'asset':
             result = result[result['market_and_exchange_names'] == selected_name]
         
