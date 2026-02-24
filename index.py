@@ -112,7 +112,7 @@ def color_index(val, low, high):
     return 'color: white'
 
 def color_percent(val, column):
-    if column == 'commercials_net_(%)' or 'large_speculators_net_(%)' or 'small_speculators_net_(%)' or 'commercials_change_(%)' or 'large_speculators_change_(%)' or 'small_speculators_change_(%)':
+    if column in ('commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)', 'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)'):
         if val < 0:
             return 'color: red'
         elif val > 0:
