@@ -111,6 +111,11 @@
         </form>
 
         <form class="controls-form" method="GET" action="/">
+            <input type="hidden" name="mode" value="percentchange">
+            <button class="button" type="submit">Show percentage changes > 5%</button>
+        </form>
+
+        <form class="controls-form" method="GET" action="/">
             <input type="hidden" name="mode" value="asset">
             <input type="hidden" name="low" value="{{ low }}">
             <input type="hidden" name="high" value="{{ high }}">

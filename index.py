@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 DEFAULT_LOW = 10
 DEFAULT_HIGH = 90
-VALID_MODES = {"all", "setups", "asset"}
+VALID_MODES = {"all", "setups", "asset", "percentchange"}
 
 csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
 will_co = WillCo(csv_path)
