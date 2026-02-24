@@ -14,12 +14,13 @@ class WillCo:
         return pd.read_csv(self.csv_path)
 
     def fetch_and_store_cot_data(self):
-        df = pd.DataFrame()
         end_year = int(datetime.date.today().strftime('%Y')) + 1
         begin_year = end_year - 7
+        yearly_frames = []
         for i in reversed(range(begin_year, end_year)):
             single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut')) 
-            df = pd.concat([df, single_year], ignore_index=True)
+            yearly_frames.append(single_year)
+        df = pd.concat(yearly_frames, ignore_index=True) if yearly_frames else pd.DataFrame()
 
         df = df.rename(columns=lambda x: x.replace(' ', '_').replace('-', '_').replace('(', '_').replace(')', '_').lower())
         df.replace('.', 0, inplace=True)
@@ -62,25 +63,13 @@ class WillCo:
 
         asset['lookback_(y)'] = "{:.1f}".format(weeks / 52)
 
-        qCommercials = []
-        qLargeSpeculators = []
-        qSmallSpeculators = []
+        available = len(asset)
+        n = min(weeks + 1, available)
+        pad = weeks + 1 - n
 
-        for i in range(0, weeks + 1):
-            try:
-                qCommercials.append(asset.iloc[i]['q_commercials'])
-            except IndexError:
-                qCommercials.append(0)
-
-            try:
-                qLargeSpeculators.append(asset.iloc[i]['q_large_speculators'])
-            except IndexError:
-                qLargeSpeculators.append(0)
-            
-            try:
-                qSmallSpeculators.append(asset.iloc[i]['q_small_speculators'])
-            except IndexError:
-                qSmallSpeculators.append(0)
+        qCommercials = asset['q_commercials'].iloc[:n].tolist() + [0] * pad
+        qLargeSpeculators = asset['q_large_speculators'].iloc[:n].tolist() + [0] * pad
+        qSmallSpeculators = asset['q_small_speculators'].iloc[:n].tolist() + [0] * pad
 
         minQCommercialsNWeeks = min(qCommercials)
         maxQCommercialsNWeeks = max(qCommercials)
