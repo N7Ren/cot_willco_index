@@ -91,9 +91,13 @@ class WillCo:
         minQSmallpeculatorsNWeeks = min(qSmallSpeculators)
         maxQSmallpeculatorsNWeeks = max(qSmallSpeculators)
 
-        asset['willco_commercials_index'] = round(((asset.iloc[0]['q_commercials'] - minQCommercialsNWeeks) / (maxQCommercialsNWeeks - minQCommercialsNWeeks)) * 100)
-        asset['willco_large_specs_index'] = round(((asset.iloc[0]['q_large_speculators'] - minQLargeSpeculatorsNWeeks) / (maxQLargeSpeculatorsNWeeks - minQLargeSpeculatorsNWeeks)) * 100)
-        asset['willco_small_specs_index'] = round(((asset.iloc[0]['q_small_speculators'] - minQSmallpeculatorsNWeeks) / (maxQSmallpeculatorsNWeeks - minQSmallpeculatorsNWeeks)) * 100)
+        commercials_range = maxQCommercialsNWeeks - minQCommercialsNWeeks
+        large_specs_range = maxQLargeSpeculatorsNWeeks - minQLargeSpeculatorsNWeeks
+        small_specs_range = maxQSmallpeculatorsNWeeks - minQSmallpeculatorsNWeeks
+
+        asset['willco_commercials_index'] = round(((asset.iloc[0]['q_commercials'] - minQCommercialsNWeeks) / commercials_range) * 100) if commercials_range != 0 else 50
+        asset['willco_large_specs_index'] = round(((asset.iloc[0]['q_large_speculators'] - minQLargeSpeculatorsNWeeks) / large_specs_range) * 100) if large_specs_range != 0 else 50
+        asset['willco_small_specs_index'] = round(((asset.iloc[0]['q_small_speculators'] - minQSmallpeculatorsNWeeks) / small_specs_range) * 100) if small_specs_range != 0 else 50
 
         if weeks == 26:
             asset['commercials_net_(%)'] = (asset.iloc[0]['commercials_net_percent'].round(2) * 100).astype(int)
