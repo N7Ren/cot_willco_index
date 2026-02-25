@@ -5,6 +5,7 @@ from flask_compress import Compress
 import pandas as pd
 from datetime import datetime
 from willco import WillCo
+from markets_loader import load_markets_safe
 
 app = Flask(__name__)
 Compress(app)
@@ -16,59 +17,12 @@ VALID_MODES = {"all", "setups", "asset", "percentchange"}
 csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
 will_co = WillCo(csv_path)
 
-# Load markets from CSV file for easy end-user modification
-def _load_markets():
-    """Load markets from CSV file with fallback to default data."""
-    markets_csv_path = os.path.join(os.path.dirname(__file__), "markets.csv")
-    
-    try:
-        # Load from CSV file
-        markets_df = pd.read_csv(markets_csv_path)
-        
-        # Validate required columns
-        if 'contract_code' not in markets_df.columns or 'contract_name' not in markets_df.columns:
-            raise ValueError("markets.csv must contain 'contract_code' and 'contract_name' columns")
-        
-        # Ensure no empty values
-        if markets_df['contract_code'].isna().any() or markets_df['contract_name'].isna().any():
-            raise ValueError("markets.csv contains empty values")
-        
-        return markets_df
-        
-    except FileNotFoundError:
-        # Fallback to hardcoded default if CSV doesn't exist
-        print(f"Warning: {markets_csv_path} not found. Using default markets.")
-        return pd.DataFrame({
-            'contract_code': ['098662', '042601', '044601', '043602', '020601',
-                              '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
-                              '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
-                              '124603', '209742', '13874A', '239742', '240741', '244042',
-                              '133741', '146021'],
-            'contract_name':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
-                                'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
-                                'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
-                                'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
-                                'BITCOIN', 'ETHER CASH SETTLED']
-        })
-    
-    except Exception as e:
-        # Handle other errors (invalid CSV format, etc.)
-        print(f"Error loading markets.csv: {e}. Using default markets.")
-        return pd.DataFrame({
-            'contract_code': ['098662', '042601', '044601', '043602', '020601',
-                              '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
-                              '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
-                              '124603', '209742', '13874A', '239742', '240741', '244042',
-                              '133741', '146021'],
-            'contract_name':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
-                                'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
-                                'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
-                                'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
-                                'BITCOIN', 'ETHER CASH SETTLED']
-        })
+# Load markets DataFrame once at module import time
+MARKETS, MARKETS_LOAD_ERROR = load_markets_safe()
 
-# Optimized: Create markets DataFrame as a constant to avoid recreation on every import
-MARKETS = _load_markets()
+# Print error to console if loading failed
+if MARKETS_LOAD_ERROR:
+    print(f"CRITICAL ERROR: {MARKETS_LOAD_ERROR}")
 
 _cached_csv_df = None
 _cached_csv_mtime = None
@@ -144,7 +98,7 @@ def parse_mode_and_asset(values):
         return 'all', None
 
     if mode == 'asset':
-        valid_assets = set(MARKETS['contract_name'])
+        valid_assets = set(MARKETS['contract_name']) if not MARKETS.empty else set()
         if asset not in valid_assets:
             return 'all', None
         return 'asset', asset
@@ -180,33 +134,36 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
         result = cached_filtered  # Optimized: removed unnecessary .copy()
     else:
         if filter_mode == 'setups':
-            mask_commercial = (result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low)
-            mask_large_specs = (result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)
-            mask_small_specs = (result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low)
-            result = result[mask_commercial | mask_large_specs | mask_small_specs]
-        elif filter_mode == 'percentchange':
-            mask_commercials_change = (result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5)
-            mask_large_specs_change = (result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)
-            mask_small_specs_change = (result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5)
-            result = result[mask_commercials_change | mask_large_specs_change | mask_small_specs_change]
+            if 'willco_commercials_index' in result.columns:
+                mask_commercial = (result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low)
+                mask_large_specs = (result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)
+                mask_small_specs = (result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low)
+                result = result[mask_commercial | mask_large_specs | mask_small_specs]
         elif filter_mode == 'asset':
-            result = result[result['market_and_exchange_names'] == selected_name]
+            if 'market_and_exchange_names' in result.columns:
+                result = result[result['market_and_exchange_names'] == selected_name]
+        elif filter_mode == 'percentchange':
+            if all(col in result.columns for col in ['commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']):
+                mask_commercials_change = (result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5)
+                mask_large_specs_change = (result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)
+                mask_small_specs_change = (result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5)
+                result = result[mask_commercials_change | mask_large_specs_change | mask_small_specs_change]
         
-        _cached_filtered_df[cache_key] = result.copy()
+        _cached_filtered_df[cache_key] = result
         if len(_cached_filtered_df) > MAX_FILTERED_CACHE_ENTRIES:
             _cached_filtered_df.popitem(last=False)
 
-    styled_df = result.style.map(lambda val: color_index(val, low, high), subset='willco_commercials_index')\
-                        .map(lambda val: color_index(val, low, high), subset='willco_large_specs_index')\
-                        .map(lambda val: color_index(val, low, high), subset='willco_small_specs_index')\
-                        .map(lambda val: color_percent(val, 'commercials_net_(%)'), subset='commercials_net_(%)')\
-                        .map(lambda val: color_percent(val, 'large_speculators_net_(%)'), subset='large_speculators_net_(%)')\
-                        .map(lambda val: color_percent(val, 'small_speculators_net_(%)'), subset='small_speculators_net_(%)')\
-                        .map(lambda val: color_percent(val, 'commercials_change_(%)'), subset='commercials_change_(%)')\
-                        .map(lambda val: color_percent(val, 'large_speculators_change_(%)'), subset='large_speculators_change_(%)')\
-                        .map(lambda val: color_percent(val, 'small_speculators_change_(%)'), subset='small_speculators_change_(%)')
-
-    styled_html = styled_df.to_html(escape=False, index=False, classes='styled-table table table-bordered table-hover')
+    if result.empty:
+        styled_html = "<p>No data available.</p>"
+    else:
+        styled = result.style.map(lambda val: color_index(val, low, high), subset=['willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index'])
+        # Apply color_percent to each column individually
+        percent_columns = ['commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)',
+                          'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']
+        for col in percent_columns:
+            if col in result.columns:
+                styled = styled.map(lambda val, column=col: color_percent(val, column), subset=[col])
+        styled_html = styled.to_html(index=False, escape=False)
 
     _cached_table_html[cache_key] = styled_html
     if len(_cached_table_html) > MAX_TABLE_CACHE_ENTRIES:
@@ -217,7 +174,12 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
 def index():
     low, high = parse_thresholds(request.args)
     mode, selected_asset = parse_mode_and_asset(request.args)
-    dropdown_options = MARKETS['contract_name']
+    
+    # Get dropdown options, handle empty MARKETS DataFrame
+    dropdown_options = MARKETS['contract_name'] if not MARKETS.empty else []
+    
+    # Check if there's a markets loading error to display
+    error_message = MARKETS_LOAD_ERROR if MARKETS_LOAD_ERROR else None
     
     # Optimized: Add HTTP caching headers for better performance
     response = make_response(render_template(
@@ -227,7 +189,8 @@ def index():
         selected_asset=selected_asset,
         low=low,
         high=high,
-        mode=mode
+        mode=mode,
+        error_message=error_message
     ))
     response.headers['Cache-Control'] = 'public, max-age=60'
     response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
@@ -251,29 +214,29 @@ def indexfilter():
 @app.route('/percentchangefilter', methods=['POST'])
 def percentchangefilter():
     low, high = parse_thresholds(request.form)
+    dropdown_options = MARKETS['contract_name'] if not MARKETS.empty else []
     return render_template(
         'index.html',
         table_html=generateTable('percentchange', low=low, high=high),
-        dropdown_options=MARKETS['contract_name'],
+        dropdown_options=dropdown_options,
         selected_asset=None,
         low=low,
         high=high,
-        mode='all'
+        mode='percentchange'
     )
 
 @app.route('/assetfilter', methods=['POST'])
 def assetfilter():
     low, high = parse_thresholds(request.form)
-    selected_name = request.form.get('asset_dropdown') or request.form.get('asset')
-    valid_assets = set(MARKETS['contract_name'])
-    if selected_name not in valid_assets:
-        return redirect(url_for('index', mode='all', low=low, high=high))
-    return redirect(url_for('index', mode='asset', asset=selected_name, low=low, high=high))
+    selected_asset = request.form.get('asset')
+    query_params = {'mode': 'asset', 'low': low, 'high': high}
+    if selected_asset:
+        query_params['asset'] = selected_asset
+    return redirect(url_for('index', **query_params))
 
 @app.route('/nofilter', methods=['POST'])
 def nofilter():
-    low, high = parse_thresholds(request.form)
-    return redirect(url_for('index', mode='all', low=low, high=high))
+    return redirect(url_for('index'))
 
 @app.route('/resources')
 def resources():
