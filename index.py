@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, redirect, url_for, make_response
 from flask_compress import Compress
 import pandas as pd
@@ -90,20 +91,36 @@ def get_csv_df():
     
     return _cached_csv_df
 
+# Number of worker threads for parallel market calculations
+MAX_WORKERS = 4
+
+def _calculate_market_periods(args):
+    """Helper function to calculate all periods for a single market."""
+    csv_df, market = args
+    frames = []
+    for weeks in [26, 52, 104, 156, 208, 260]:
+        frames.append(will_co.calculateWillCo(csv_df, market, weeks))
+    return frames
+
 def get_results_df():
     global _cached_results_df, _cached_results_mtime, _cached_table_html, _cached_filtered_df
     csv_df = get_csv_df()
     csv_mtime = _cached_csv_mtime
 
     if _cached_results_df is None or _cached_results_mtime != csv_mtime:
+        # OPTIMIZATION: Use ThreadPoolExecutor for parallel market calculations
+        markets = MARKETS['contract_code'].tolist()
         frames = []
-        for market in MARKETS['contract_code']:
-            frames.append(will_co.calculateWillCo(csv_df, market, 26))
-            frames.append(will_co.calculateWillCo(csv_df, market, 52))
-            frames.append(will_co.calculateWillCo(csv_df, market, 104))
-            frames.append(will_co.calculateWillCo(csv_df, market, 156))
-            frames.append(will_co.calculateWillCo(csv_df, market, 208))
-            frames.append(will_co.calculateWillCo(csv_df, market, 260))
+        
+        # Prepare arguments for parallel execution
+        args_list = [(csv_df, market) for market in markets]
+        
+        # Use ThreadPoolExecutor to parallelize calculations
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = executor.map(_calculate_market_periods, args_list)
+            for result_frames in futures:
+                frames.extend(result_frames)
+        
         _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         _cached_results_mtime = csv_mtime
         _cached_table_html.clear()
