@@ -1,9 +1,11 @@
 import os
 from collections import OrderedDict
+from functools import lru_cache
 from flask import Flask, render_template, request, redirect, url_for, make_response
 from flask_compress import Compress
 import pandas as pd
 from datetime import datetime
+import time
 from willco import WillCo
 from markets_loader import load_markets_safe
 
@@ -26,25 +28,35 @@ if MARKETS_LOAD_ERROR:
 
 _cached_csv_df = None
 _cached_csv_mtime = None
+_cached_csv_mtime_check = 0  # Track last mtime check time
 _cached_results_df = None
 _cached_results_mtime = None
 _cached_table_html = OrderedDict()
 _cached_filtered_df = OrderedDict()
 MAX_TABLE_CACHE_ENTRIES = 32
 MAX_FILTERED_CACHE_ENTRIES = 32
+MTIME_CHECK_INTERVAL = 5  # Only check mtime every 5 seconds
 
 def get_csv_df():
-    global _cached_csv_df, _cached_csv_mtime
-    try:
-        mtime = os.path.getmtime(csv_path)
-    except OSError:
-        _cached_csv_df = None
-        _cached_csv_mtime = None
-        return will_co.read_csv()
+    global _cached_csv_df, _cached_csv_mtime, _cached_csv_mtime_check
+    current_time = time.time()
+    
+    # Only check mtime periodically to avoid excessive filesystem calls
+    needs_check = (current_time - _cached_csv_mtime_check) > MTIME_CHECK_INTERVAL
+    
+    if needs_check:
+        try:
+            mtime = os.path.getmtime(csv_path)
+            _cached_csv_mtime_check = current_time
+        except OSError:
+            _cached_csv_df = None
+            _cached_csv_mtime = None
+            return will_co.read_csv()
 
-    if _cached_csv_df is None or _cached_csv_mtime != mtime:
-        _cached_csv_df = will_co.read_csv()
-        _cached_csv_mtime = mtime
+        if _cached_csv_df is None or _cached_csv_mtime != mtime:
+            _cached_csv_df = will_co.read_csv()
+            _cached_csv_mtime = mtime
+    
     return _cached_csv_df
 
 def get_results_df():
@@ -192,19 +204,19 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     else:
         if filter_mode == 'setups':
             if 'willco_commercials_index' in result.columns:
-                mask_commercial = (result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low)
-                mask_large_specs = (result['willco_large_specs_index'] >= high) | (result['willco_large_specs_index'] <= low)
-                mask_small_specs = (result['willco_small_specs_index'] >= high) | (result['willco_small_specs_index'] <= low)
-                result = result[mask_commercial | mask_large_specs | mask_small_specs]
+                # OPTIMIZATION: Use df.query() for more efficient filtering
+                query = f'(willco_commercials_index >= {high} or willco_commercials_index <= {low}) or (willco_large_specs_index >= {high} or willco_large_specs_index <= {low}) or (willco_small_specs_index >= {high} or willco_small_specs_index <= {low})'
+                result = result.query(query)
         elif filter_mode == 'asset':
             if 'market_and_exchange_names' in result.columns:
-                result = result[result['market_and_exchange_names'] == selected_name]
+                # OPTIMIZATION: Use df.query() for more efficient filtering
+                result = result.query(f'market_and_exchange_names == "{selected_name}"')
         elif filter_mode == 'percentchange':
             if all(col in result.columns for col in ['commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']):
-                mask_commercials_change = (result['commercials_change_(%)'] >= 5) | (result['commercials_change_(%)'] <= -5)
-                mask_large_specs_change = (result['large_speculators_change_(%)'] >= 5) | (result['large_speculators_change_(%)'] <= -5)
-                mask_small_specs_change = (result['small_speculators_change_(%)'] >= 5) | (result['small_speculators_change_(%)'] <= -5)
-                result = result[mask_commercials_change | mask_large_specs_change | mask_small_specs_change]
+                # OPTIMIZATION: Use df.query() for more efficient filtering
+                # Use backticks to escape column names with special characters
+                query = '`commercials_change_(%)` >= 5 or `commercials_change_(%)` <= -5 or `large_speculators_change_(%)` >= 5 or `large_speculators_change_(%)` <= -5 or `small_speculators_change_(%)` >= 5 or `small_speculators_change_(%)` <= -5'
+                result = result.query(query)
         
         _cached_filtered_df[cache_key] = result
         if len(_cached_filtered_df) > MAX_FILTERED_CACHE_ENTRIES:
