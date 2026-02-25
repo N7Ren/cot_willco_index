@@ -159,10 +159,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Exception: markets.csv should be tracked (configuration file)
-!markets.csv
-
-*.csv
 *.db
 *.zip
 *.db-journal
