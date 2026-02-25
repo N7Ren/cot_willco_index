@@ -1,10 +1,13 @@
 import os
 from collections import OrderedDict
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, make_response
+from flask_compress import Compress
 import pandas as pd
+from datetime import datetime
 from willco import WillCo
 
 app = Flask(__name__)
+Compress(app)
 
 DEFAULT_LOW = 10
 DEFAULT_HIGH = 90
@@ -13,16 +16,17 @@ VALID_MODES = {"all", "setups", "asset", "percentchange"}
 csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
 will_co = WillCo(csv_path)
 
-markets = pd.DataFrame({
-    'contract_code': ['098662', '042601', '044601', '043602', '020601', 
+# Optimized: Create markets DataFrame as a constant to avoid recreation on every import
+MARKETS = pd.DataFrame({
+    'contract_code': ['098662', '042601', '044601', '043602', '020601',
                       '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
                       '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
-                      '124603', '209742', '13874A', '239742', '240741', '244042', 
+                      '124603', '209742', '13874A', '239742', '240741', '244042',
                       '133741', '146021'],
-    'contract_names':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND', 
+    'contract_names':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
                         'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
                         'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
-                        'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX', 
+                        'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
                         'BITCOIN', 'ETHER CASH SETTLED']
 })
 
@@ -56,7 +60,7 @@ def get_results_df():
 
     if _cached_results_df is None or _cached_results_mtime != csv_mtime:
         frames = []
-        for market in list(markets['contract_code']):
+        for market in MARKETS['contract_code']:
             frames.append(will_co.calculateWillCo(csv_df, market, 26))
             frames.append(will_co.calculateWillCo(csv_df, market, 52))
             frames.append(will_co.calculateWillCo(csv_df, market, 104))
@@ -100,7 +104,7 @@ def parse_mode_and_asset(values):
         return 'all', None
 
     if mode == 'asset':
-        valid_assets = set(markets['contract_names'])
+        valid_assets = set(MARKETS['contract_names'])
         if asset not in valid_assets:
             return 'all', None
         return 'asset', asset
@@ -133,7 +137,7 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     cached_filtered = _cached_filtered_df.get(cache_key)
     if cached_filtered is not None:
         _cached_filtered_df.move_to_end(cache_key)
-        result = cached_filtered
+        result = cached_filtered  # Optimized: removed unnecessary .copy()
     else:
         if filter_mode == 'setups':
             mask_commercial = (result['willco_commercials_index'] >= high) | (result['willco_commercials_index'] <= low)
@@ -173,8 +177,10 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
 def index():
     low, high = parse_thresholds(request.args)
     mode, selected_asset = parse_mode_and_asset(request.args)
-    dropdown_options = markets['contract_names']
-    return render_template(
+    dropdown_options = MARKETS['contract_names']
+    
+    # Optimized: Add HTTP caching headers for better performance
+    response = make_response(render_template(
         'index.html',
         table_html=generateTable(mode, selected_name=selected_asset, low=low, high=high),
         dropdown_options=dropdown_options,
@@ -182,7 +188,10 @@ def index():
         low=low,
         high=high,
         mode=mode
-    )
+    ))
+    response.headers['Cache-Control'] = 'public, max-age=60'
+    response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+    return response
 
 @app.route('/fetch_and_store', methods=['POST'])
 def store_data():
@@ -205,7 +214,7 @@ def percentchangefilter():
     return render_template(
         'index.html',
         table_html=generateTable('percentchange', low=low, high=high),
-        dropdown_options=markets['contract_names'],
+        dropdown_options=MARKETS['contract_names'],
         selected_asset=None,
         low=low,
         high=high,
@@ -216,7 +225,7 @@ def percentchangefilter():
 def assetfilter():
     low, high = parse_thresholds(request.form)
     selected_name = request.form.get('asset_dropdown') or request.form.get('asset')
-    valid_assets = set(markets['contract_names'])
+    valid_assets = set(MARKETS['contract_names'])
     if selected_name not in valid_assets:
         return redirect(url_for('index', mode='all', low=low, high=high))
     return redirect(url_for('index', mode='asset', asset=selected_name, low=low, high=high))

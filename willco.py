@@ -1,6 +1,7 @@
 import os
 import cot_reports as cot
 import pandas as pd
+import numpy as np
 import datetime
 
 class WillCo:
@@ -83,18 +84,19 @@ class WillCo:
         n = min(weeks + 1, available)
         pad = weeks + 1 - n
 
-        qCommercials = asset['q_commercials'].iloc[:n].tolist() + [0] * pad
-        qLargeSpeculators = asset['q_large_speculators'].iloc[:n].tolist() + [0] * pad
-        qSmallSpeculators = asset['q_small_speculators'].iloc[:n].tolist() + [0] * pad
+        # Optimized: Use NumPy arrays instead of Python lists for better performance
+        qCommercials = np.pad(asset['q_commercials'].iloc[:n].values, (0, pad), constant_values=0)
+        qLargeSpeculators = np.pad(asset['q_large_speculators'].iloc[:n].values, (0, pad), constant_values=0)
+        qSmallSpeculators = np.pad(asset['q_small_speculators'].iloc[:n].values, (0, pad), constant_values=0)
 
-        minQCommercialsNWeeks = min(qCommercials)
-        maxQCommercialsNWeeks = max(qCommercials)
+        minQCommercialsNWeeks = qCommercials.min()
+        maxQCommercialsNWeeks = qCommercials.max()
 
-        minQLargeSpeculatorsNWeeks = min(qLargeSpeculators)
-        maxQLargeSpeculatorsNWeeks = max(qLargeSpeculators)
+        minQLargeSpeculatorsNWeeks = qLargeSpeculators.min()
+        maxQLargeSpeculatorsNWeeks = qLargeSpeculators.max()
 
-        minQSmallpeculatorsNWeeks = min(qSmallSpeculators)
-        maxQSmallpeculatorsNWeeks = max(qSmallSpeculators)
+        minQSmallpeculatorsNWeeks = qSmallSpeculators.min()
+        maxQSmallpeculatorsNWeeks = qSmallSpeculators.max()
 
         commercials_range = maxQCommercialsNWeeks - minQCommercialsNWeeks
         large_specs_range = maxQLargeSpeculatorsNWeeks - minQLargeSpeculatorsNWeeks
