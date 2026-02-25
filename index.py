@@ -1,11 +1,11 @@
 import os
-from collections import OrderedDict
 from functools import lru_cache
 from flask import Flask, render_template, request, redirect, url_for, make_response
 from flask_compress import Compress
 import pandas as pd
 from datetime import datetime
 import time
+from email.utils import parsedate_to_datetime
 from willco import WillCo
 from markets_loader import load_markets_safe
 
@@ -31,10 +31,41 @@ _cached_csv_mtime = None
 _cached_csv_mtime_check = 0  # Track last mtime check time
 _cached_results_df = None
 _cached_results_mtime = None
-_cached_table_html = OrderedDict()
-_cached_filtered_df = OrderedDict()
-MAX_TABLE_CACHE_ENTRIES = 32
-MAX_FILTERED_CACHE_ENTRIES = 32
+
+# Use LRU cache for table HTML and filtered DataFrames (bottleneck #5.1 fix)
+from functools import lru_cache
+
+# Simple LRU cache class with maxsize
+class LRUCache:
+    def __init__(self, maxsize=32):
+        self.cache = {}
+        self.access_order = []
+        self.maxsize = maxsize
+    
+    def get(self, key):
+        if key in self.cache:
+            # Move to end (most recently used)
+            self.access_order.remove(key)
+            self.access_order.append(key)
+            return self.cache[key]
+        return None
+    
+    def put(self, key, value):
+        if key in self.cache:
+            self.access_order.remove(key)
+        elif len(self.cache) >= self.maxsize:
+            # Remove least recently used (first item)
+            oldest = self.access_order.pop(0)
+            del self.cache[oldest]
+        self.cache[key] = value
+        self.access_order.append(key)
+    
+    def clear(self):
+        self.cache.clear()
+        self.access_order.clear()
+
+_cached_table_html = LRUCache(maxsize=32)
+_cached_filtered_df = LRUCache(maxsize=32)
 MTIME_CHECK_INTERVAL = 5  # Only check mtime every 5 seconds
 
 def get_csv_df():
@@ -194,13 +225,11 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     cache_key = (_cached_results_mtime, filter_mode, low, high, selected_name)
     cached_html = _cached_table_html.get(cache_key)
     if cached_html is not None:
-        _cached_table_html.move_to_end(cache_key)
         return cached_html
     
     cached_filtered = _cached_filtered_df.get(cache_key)
     if cached_filtered is not None:
-        _cached_filtered_df.move_to_end(cache_key)
-        result = cached_filtered  # Optimized: removed unnecessary .copy()
+        result = cached_filtered
     else:
         if filter_mode == 'setups':
             if 'willco_commercials_index' in result.columns:
@@ -218,9 +247,8 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
                 query = '`commercials_change_(%)` >= 5 or `commercials_change_(%)` <= -5 or `large_speculators_change_(%)` >= 5 or `large_speculators_change_(%)` <= -5 or `small_speculators_change_(%)` >= 5 or `small_speculators_change_(%)` <= -5'
                 result = result.query(query)
         
-        _cached_filtered_df[cache_key] = result
-        if len(_cached_filtered_df) > MAX_FILTERED_CACHE_ENTRIES:
-            _cached_filtered_df.popitem(last=False)
+        # Use put() method which handles LRU eviction automatically
+        _cached_filtered_df.put(cache_key, result)
 
     if result.empty:
         styled_html = "<p>No data available.</p>"
@@ -257,13 +285,16 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
         
         styled_html = styled.to_html(index=False, escape=False)
 
-    _cached_table_html[cache_key] = styled_html
-    if len(_cached_table_html) > MAX_TABLE_CACHE_ENTRIES:
-        _cached_table_html.popitem(last=False)
+    # Use put() method which handles LRU eviction automatically
+    _cached_table_html.put(cache_key, styled_html)
     return styled_html
+
+# Track last data modification time for HTTP caching
+_last_data_mtime = time.time()
 
 @app.route('/')
 def index():
+    global _last_data_mtime
     low, high = parse_thresholds(request.args)
     mode, selected_asset = parse_mode_and_asset(request.args)
     
@@ -273,10 +304,31 @@ def index():
     # Check if there's a markets loading error to display
     error_message = MARKETS_LOAD_ERROR if MARKETS_LOAD_ERROR else None
     
-    # Optimized: Add HTTP caching headers for better performance
+    # OPTIMIZATION: Check If-Modified-Since header (bottleneck #8.1 fix)
+    if_none_match = request.headers.get('If-None-Match')
+    if_modified_since = request.headers.get('If-Modified-Since')
+    
+    # Generate ETag based on current parameters
+    current_etag = f'"{mode}-{low}-{high}-{selected_asset}"'
+    
+    # Check if client has cached version
+    if if_none_match and if_none_match == current_etag:
+        # Also check If-Modified-Since
+        if if_modified_since:
+            try:
+                client_time = parsedate_to_datetime(if_modified_since)
+                server_time = datetime.fromtimestamp(_last_data_mtime)
+                if client_time >= server_time:
+                    return '', 304  # Not Modified
+            except (ValueError, TypeError):
+                pass  # Invalid date, proceed normally
+    
+    # Generate the table
+    table_html = generateTable(mode, selected_name=selected_asset, low=low, high=high)
+    
     response = make_response(render_template(
         'index.html',
-        table_html=generateTable(mode, selected_name=selected_asset, low=low, high=high),
+        table_html=table_html,
         dropdown_options=dropdown_options,
         selected_asset=selected_asset,
         low=low,
@@ -284,8 +336,11 @@ def index():
         mode=mode,
         error_message=error_message
     ))
+    
+    # Set caching headers
     response.headers['Cache-Control'] = 'public, max-age=60'
     response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+    response.headers['ETag'] = current_etag
     return response
 
 @app.route('/fetch_and_store', methods=['POST'])
