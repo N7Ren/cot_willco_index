@@ -120,6 +120,63 @@ def color_percent(val, column):
             return 'color: green'
     return 'color: white'
 
+
+def _compute_index_colors_vectorized(df, low, high):
+    """
+    Pre-compute color arrays for willco index columns using vectorized NumPy operations.
+    This is much faster than using lambda functions per cell.
+    
+    Returns a DataFrame with same shape as subset columns, containing color strings.
+    """
+    import numpy as np
+    
+    index_cols = ['willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index']
+    available_cols = [col for col in index_cols if col in df.columns]
+    
+    if not available_cols:
+        return pd.DataFrame(index=df.index)
+    
+    # Create color DataFrame with default white
+    color_df = pd.DataFrame('color: white', index=df.index, columns=available_cols)
+    
+    for col in available_cols:
+        values = df[col].values
+        # Vectorized: red where val <= low, green where val >= high, else white
+        # NOTE: Using 'color:green' (no space) to match original color_index() function
+        colors = np.where(values <= low, 'color: red',
+                np.where(values >= high, 'color:green', 'color: white'))
+        color_df[col] = colors
+    
+    return color_df
+
+
+def _compute_percent_colors_vectorized(df):
+    """
+    Pre-compute color arrays for percent columns using vectorized NumPy operations.
+    
+    Returns a DataFrame with same shape as percent columns, containing color strings.
+    """
+    import numpy as np
+    
+    percent_columns = ['commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)',
+                       'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']
+    available_cols = [col for col in percent_columns if col in df.columns]
+    
+    if not available_cols:
+        return pd.DataFrame(index=df.index)
+    
+    # Create color DataFrame with default white
+    color_df = pd.DataFrame('color: white', index=df.index, columns=available_cols)
+    
+    for col in available_cols:
+        values = df[col].values
+        # Vectorized: red where val < 0, green where val > 0, else white
+        colors = np.where(values < 0, 'color: red',
+                np.where(values > 0, 'color: green', 'color: white'))
+        color_df[col] = colors
+    
+    return color_df
+
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
     result = get_results_df()
     cache_key = (_cached_results_mtime, filter_mode, low, high, selected_name)
@@ -156,13 +213,36 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
     if result.empty:
         styled_html = "<p>No data available.</p>"
     else:
-        styled = result.style.map(lambda val: color_index(val, low, high), subset=['willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index'])
-        # Apply color_percent to each column individually
-        percent_columns = ['commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)',
-                          'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']
-        for col in percent_columns:
-            if col in result.columns:
-                styled = styled.map(lambda val, column=col: color_percent(val, column), subset=[col])
+        # OPTIMIZATION: Pre-compute all color arrays using vectorized NumPy operations
+        # This is much faster than calling a Python function per cell
+        index_colors = _compute_index_colors_vectorized(result, low, high)
+        percent_colors = _compute_percent_colors_vectorized(result)
+        
+        styled = result.style
+        
+        # Apply index column colors using .apply() which works on entire columns
+        # This is more efficient than .map() which calls function per cell
+        index_cols = ['willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index']
+        for col in index_cols:
+            if col in result.columns and col in index_colors.columns:
+                # .apply() passes the entire column as a Series, we return a Series of colors
+                def make_col_mapper(color_series):
+                    def mapper(col):
+                        return color_series.values
+                    return mapper
+                styled = styled.apply(make_col_mapper(index_colors[col]), axis=0, subset=[col])
+        
+        # Apply percent column colors using .apply()
+        percent_cols = ['commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)',
+                       'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']
+        for col in percent_cols:
+            if col in result.columns and col in percent_colors.columns:
+                def make_col_mapper(color_series):
+                    def mapper(col):
+                        return color_series.values
+                    return mapper
+                styled = styled.apply(make_col_mapper(percent_colors[col]), axis=0, subset=[col])
+        
         styled_html = styled.to_html(index=False, escape=False)
 
     _cached_table_html[cache_key] = styled_html
