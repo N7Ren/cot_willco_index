@@ -15,6 +15,7 @@ Current tracked repo files:
 - `index.py`
 - `willco.py`
 - `templates/index.html`
+- `markets.csv` - Market configuration file (see [MARKETS_GUIDE.md](MARKETS_GUIDE.md))
 - `README.md`
 - `LICENSE`
 
@@ -81,9 +82,13 @@ Open `http://127.0.0.1:5000`.
 
 ## Implementation notes
 
-- Market universe is hard-coded in `index.py`.
+- Market universe is configured in `markets.csv` (see [MARKETS_GUIDE.md](MARKETS_GUIDE.md) for how to customize).
 - `cot.csv` is expected at repository root and is generated on first run if missing.
 - The app runs with `debug=True` in `index.py`.
+
+## Customizing Markets
+
+The application loads its market list from `markets.csv`, which can be easily edited to add, remove, or modify markets without changing any code. See [MARKETS_GUIDE.md](MARKETS_GUIDE.md) for detailed instructions on how to customize the market list.
 
 ## License
 

@@ -16,19 +16,59 @@ VALID_MODES = {"all", "setups", "asset", "percentchange"}
 csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
 will_co = WillCo(csv_path)
 
+# Load markets from CSV file for easy end-user modification
+def _load_markets():
+    """Load markets from CSV file with fallback to default data."""
+    markets_csv_path = os.path.join(os.path.dirname(__file__), "markets.csv")
+    
+    try:
+        # Load from CSV file
+        markets_df = pd.read_csv(markets_csv_path)
+        
+        # Validate required columns
+        if 'contract_code' not in markets_df.columns or 'contract_name' not in markets_df.columns:
+            raise ValueError("markets.csv must contain 'contract_code' and 'contract_name' columns")
+        
+        # Ensure no empty values
+        if markets_df['contract_code'].isna().any() or markets_df['contract_name'].isna().any():
+            raise ValueError("markets.csv contains empty values")
+        
+        return markets_df
+        
+    except FileNotFoundError:
+        # Fallback to hardcoded default if CSV doesn't exist
+        print(f"Warning: {markets_csv_path} not found. Using default markets.")
+        return pd.DataFrame({
+            'contract_code': ['098662', '042601', '044601', '043602', '020601',
+                              '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
+                              '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
+                              '124603', '209742', '13874A', '239742', '240741', '244042',
+                              '133741', '146021'],
+            'contract_name':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
+                                'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
+                                'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
+                                'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
+                                'BITCOIN', 'ETHER CASH SETTLED']
+        })
+    
+    except Exception as e:
+        # Handle other errors (invalid CSV format, etc.)
+        print(f"Error loading markets.csv: {e}. Using default markets.")
+        return pd.DataFrame({
+            'contract_code': ['098662', '042601', '044601', '043602', '020601',
+                              '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
+                              '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
+                              '124603', '209742', '13874A', '239742', '240741', '244042',
+                              '133741', '146021'],
+            'contract_name':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
+                                'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
+                                'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
+                                'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
+                                'BITCOIN', 'ETHER CASH SETTLED']
+        })
+
 # Optimized: Create markets DataFrame as a constant to avoid recreation on every import
-MARKETS = pd.DataFrame({
-    'contract_code': ['098662', '042601', '044601', '043602', '020601',
-                      '232741', '102741', '096742', '090741', '099741', '097741', '092741', '112741', '095741', '122741', '299741', '399741',
-                      '088691', '084691', '075651', '076651', '067651', '023651', '002602', '073732', '083731', '005602',
-                      '124603', '209742', '13874A', '239742', '240741', '244042',
-                      '133741', '146021'],
-    'contract_names':  ['USD INDEX', 'UST 2Y NOTE', 'UST 5Y NOTE', 'UST 10Y NOTE', 'UST BOND',
-                        'AUSTRALIAN DOLLAR', 'BRAZILIAN REAL', 'BRITISH POUND', 'CANADIAN DOLLAR', 'EURO FX', 'JAPANESE YEN', 'SWISS FRANC', 'NZ DOLLAR', 'MEXICAN PESO', 'SO AFRICAN RAND', 'EUR FX/GBP', 'EURO FX/JPY',
-                        'GOLD', 'SILVER', 'PALLADIUM', 'PLATINUM', 'WTI-PHYSICAL', 'NAT GAS NYME', 'CORN', 'COCOA', 'COFFEE C', 'SOYBEANS',
-                        'DJIA x $5', 'NASDAQ MINI', 'E-MINI S&P 500', 'RUSSELL E-MINI', 'NIKKEI STOCK AVERAGE', 'MSCI EM INDEX',
-                        'BITCOIN', 'ETHER CASH SETTLED']
-})
+MARKETS = _load_markets()
 
 _cached_csv_df = None
 _cached_csv_mtime = None
@@ -104,7 +144,7 @@ def parse_mode_and_asset(values):
         return 'all', None
 
     if mode == 'asset':
-        valid_assets = set(MARKETS['contract_names'])
+        valid_assets = set(MARKETS['contract_name'])
         if asset not in valid_assets:
             return 'all', None
         return 'asset', asset
@@ -177,7 +217,7 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
 def index():
     low, high = parse_thresholds(request.args)
     mode, selected_asset = parse_mode_and_asset(request.args)
-    dropdown_options = MARKETS['contract_names']
+    dropdown_options = MARKETS['contract_name']
     
     # Optimized: Add HTTP caching headers for better performance
     response = make_response(render_template(
@@ -214,7 +254,7 @@ def percentchangefilter():
     return render_template(
         'index.html',
         table_html=generateTable('percentchange', low=low, high=high),
-        dropdown_options=MARKETS['contract_names'],
+        dropdown_options=MARKETS['contract_name'],
         selected_asset=None,
         low=low,
         high=high,
@@ -225,7 +265,7 @@ def percentchangefilter():
 def assetfilter():
     low, high = parse_thresholds(request.form)
     selected_name = request.form.get('asset_dropdown') or request.form.get('asset')
-    valid_assets = set(MARKETS['contract_names'])
+    valid_assets = set(MARKETS['contract_name'])
     if selected_name not in valid_assets:
         return redirect(url_for('index', mode='all', low=low, high=high))
     return redirect(url_for('index', mode='asset', asset=selected_name, low=low, high=high))
