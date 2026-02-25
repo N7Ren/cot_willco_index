@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, redirect, url_for, make_response
 from flask_compress import Compress
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 from email.utils import parsedate_to_datetime
 from willco import WillCo
@@ -356,7 +356,7 @@ def index():
     
     # Set caching headers
     response.headers['Cache-Control'] = 'public, max-age=60'
-    response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+    response.headers['Last-Modified'] = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
     response.headers['ETag'] = current_etag
     return response
 
