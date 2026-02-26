@@ -22,13 +22,33 @@ class WillCo:
         'percent_small_speculators_long',
     ]
 
-    def __init__(self, csv_path):        
+    # Specify dtypes for faster CSV reading (bottleneck #10.2 fix)
+    CSV_DTYPES = {
+        'cftc_contract_market_code': str,
+        'market_and_exchange_names': str,
+        'as_of_date_in_form_yyyy_mm_dd': str,
+        'q_commercials': float,
+        'q_large_speculators': float,
+        'q_small_speculators': float,
+        'commercials_net_percent': float,
+        'large_speculators_net_percent': float,
+        'small_speculators_net_percent': float,
+        'percent_commercials_long': float,
+        'percent_large_speculators_long': float,
+        'percent_small_speculators_long': float,
+    }
+
+    def __init__(self, csv_path):
         self.csv_path = csv_path
         if not os.path.exists(self.csv_path):
             self.fetch_and_store_cot_data()
 
     def read_csv(self):
-        return pd.read_csv(self.csv_path, usecols=self.REQUIRED_CSV_COLUMNS)
+        return pd.read_csv(
+            self.csv_path,
+            usecols=self.REQUIRED_CSV_COLUMNS,
+            dtype=self.CSV_DTYPES
+        )
 
     def fetch_and_store_cot_data(self):
         end_year = int(datetime.date.today().strftime('%Y')) + 1
