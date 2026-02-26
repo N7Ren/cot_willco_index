@@ -6,6 +6,7 @@ from flask_compress import Compress
 import pandas as pd
 from datetime import datetime, timezone
 import time
+import threading
 from email.utils import parsedate_to_datetime
 from willco import WillCo
 from markets_loader import load_markets_safe
@@ -69,27 +70,36 @@ _cached_table_html = LRUCache(maxsize=32)
 _cached_filtered_df = LRUCache(maxsize=32)
 MTIME_CHECK_INTERVAL = 5  # Only check mtime every 5 seconds
 
+# Thread locks for thread-safe cache operations (bottleneck #6.1 fix)
+_csv_cache_lock = threading.Lock()
+_results_cache_lock = threading.Lock()
+_table_html_lock = threading.Lock()
+_filtered_df_lock = threading.Lock()
+
 def get_csv_df():
     global _cached_csv_df, _cached_csv_mtime, _cached_csv_mtime_check
-    current_time = time.time()
     
-    # Only check mtime periodically to avoid excessive filesystem calls
-    needs_check = (current_time - _cached_csv_mtime_check) > MTIME_CHECK_INTERVAL
-    
-    if needs_check:
-        try:
-            mtime = os.path.getmtime(csv_path)
-            _cached_csv_mtime_check = current_time
-        except OSError:
-            _cached_csv_df = None
-            _cached_csv_mtime = None
-            return will_co.read_csv()
+    # Use lock for thread-safe access
+    with _csv_cache_lock:
+        current_time = time.time()
+        
+        # Only check mtime periodically to avoid excessive filesystem calls
+        needs_check = (current_time - _cached_csv_mtime_check) > MTIME_CHECK_INTERVAL
+        
+        if needs_check:
+            try:
+                mtime = os.path.getmtime(csv_path)
+                _cached_csv_mtime_check = current_time
+            except OSError:
+                _cached_csv_df = None
+                _cached_csv_mtime = None
+                return will_co.read_csv()
 
-        if _cached_csv_df is None or _cached_csv_mtime != mtime:
-            _cached_csv_df = will_co.read_csv()
-            _cached_csv_mtime = mtime
-    
-    return _cached_csv_df
+            if _cached_csv_df is None or _cached_csv_mtime != mtime:
+                _cached_csv_df = will_co.read_csv()
+                _cached_csv_mtime = mtime
+        
+        return _cached_csv_df
 
 # Number of worker threads for parallel market calculations
 MAX_WORKERS = 4
@@ -104,28 +114,31 @@ def _calculate_market_periods(args):
 
 def get_results_df():
     global _cached_results_df, _cached_results_mtime, _cached_table_html, _cached_filtered_df
-    csv_df = get_csv_df()
-    csv_mtime = _cached_csv_mtime
+    
+    # Use lock for thread-safe access
+    with _results_cache_lock:
+        csv_df = get_csv_df()
+        csv_mtime = _cached_csv_mtime
 
-    if _cached_results_df is None or _cached_results_mtime != csv_mtime:
-        # OPTIMIZATION: Use ThreadPoolExecutor for parallel market calculations
-        markets = MARKETS['contract_code'].tolist()
-        frames = []
-        
-        # Prepare arguments for parallel execution
-        args_list = [(csv_df, market) for market in markets]
-        
-        # Use ThreadPoolExecutor to parallelize calculations
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = executor.map(_calculate_market_periods, args_list)
-            for result_frames in futures:
-                frames.extend(result_frames)
-        
-        _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-        _cached_results_mtime = csv_mtime
-        _cached_table_html.clear()
-        _cached_filtered_df.clear()
-    return _cached_results_df
+        if _cached_results_df is None or _cached_results_mtime != csv_mtime:
+            # OPTIMIZATION: Use ThreadPoolExecutor for parallel market calculations
+            markets = MARKETS['contract_code'].tolist()
+            frames = []
+            
+            # Prepare arguments for parallel execution
+            args_list = [(csv_df, market) for market in markets]
+            
+            # Use ThreadPoolExecutor to parallelize calculations
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = executor.map(_calculate_market_periods, args_list)
+                for result_frames in futures:
+                    frames.extend(result_frames)
+            
+            _cached_results_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+            _cached_results_mtime = csv_mtime
+            _cached_table_html.clear()
+            _cached_filtered_df.clear()
+        return _cached_results_df
 
 def clamp(value, lower, upper):
     return max(lower, min(value, upper))
@@ -240,32 +253,36 @@ def _compute_percent_colors_vectorized(df):
 def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT_HIGH):
     result = get_results_df()
     cache_key = (_cached_results_mtime, filter_mode, low, high, selected_name)
-    cached_html = _cached_table_html.get(cache_key)
-    if cached_html is not None:
-        return cached_html
     
-    cached_filtered = _cached_filtered_df.get(cache_key)
-    if cached_filtered is not None:
-        result = cached_filtered
-    else:
-        if filter_mode == 'setups':
-            if 'willco_commercials_index' in result.columns:
-                # OPTIMIZATION: Use df.query() for more efficient filtering
-                query = f'(willco_commercials_index >= {high} or willco_commercials_index <= {low}) or (willco_large_specs_index >= {high} or willco_large_specs_index <= {low}) or (willco_small_specs_index >= {high} or willco_small_specs_index <= {low})'
-                result = result.query(query)
-        elif filter_mode == 'asset':
-            if 'market_and_exchange_names' in result.columns:
-                # OPTIMIZATION: Use df.query() for more efficient filtering
-                result = result.query(f'market_and_exchange_names == "{selected_name}"')
-        elif filter_mode == 'percentchange':
-            if all(col in result.columns for col in ['commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']):
-                # OPTIMIZATION: Use df.query() for more efficient filtering
-                # Use backticks to escape column names with special characters
-                query = '`commercials_change_(%)` >= 5 or `commercials_change_(%)` <= -5 or `large_speculators_change_(%)` >= 5 or `large_speculators_change_(%)` <= -5 or `small_speculators_change_(%)` >= 5 or `small_speculators_change_(%)` <= -5'
-                result = result.query(query)
-        
-        # Use put() method which handles LRU eviction automatically
-        _cached_filtered_df.put(cache_key, result)
+    # Use locks for thread-safe cache access
+    with _table_html_lock:
+        cached_html = _cached_table_html.get(cache_key)
+        if cached_html is not None:
+            return cached_html
+    
+    with _filtered_df_lock:
+        cached_filtered = _cached_filtered_df.get(cache_key)
+        if cached_filtered is not None:
+            result = cached_filtered
+        else:
+            if filter_mode == 'setups':
+                if 'willco_commercials_index' in result.columns:
+                    # OPTIMIZATION: Use df.query() for more efficient filtering
+                    query = f'(willco_commercials_index >= {high} or willco_commercials_index <= {low}) or (willco_large_specs_index >= {high} or willco_large_specs_index <= {low}) or (willco_small_specs_index >= {high} or willco_small_specs_index <= {low})'
+                    result = result.query(query)
+            elif filter_mode == 'asset':
+                if 'market_and_exchange_names' in result.columns:
+                    # OPTIMIZATION: Use df.query() for more efficient filtering
+                    result = result.query(f'market_and_exchange_names == "{selected_name}"')
+            elif filter_mode == 'percentchange':
+                if all(col in result.columns for col in ['commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)']):
+                    # OPTIMIZATION: Use df.query() for more efficient filtering
+                    # Use backticks to escape column names with special characters
+                    query = '`commercials_change_(%)` >= 5 or `commercials_change_(%)` <= -5 or `large_speculators_change_(%)` >= 5 or `large_speculators_change_(%)` <= -5 or `small_speculators_change_(%)` >= 5 or `small_speculators_change_(%)` <= -5'
+                    result = result.query(query)
+            
+            # Use put() method which handles LRU eviction automatically
+            _cached_filtered_df.put(cache_key, result)
 
     if result.empty:
         styled_html = "<p>No data available.</p>"
@@ -303,7 +320,8 @@ def generateTable(filter_mode, selected_name=None, low=DEFAULT_LOW, high=DEFAULT
         styled_html = styled.to_html(index=False, escape=False)
 
     # Use put() method which handles LRU eviction automatically
-    _cached_table_html.put(cache_key, styled_html)
+    with _table_html_lock:
+        _cached_table_html.put(cache_key, styled_html)
     return styled_html
 
 # Track last data modification time for HTTP caching
