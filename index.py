@@ -105,10 +105,14 @@ MAX_WORKERS = 4
 
 def _calculate_market_periods(args):
     """Helper function to calculate all periods for a single market."""
-    csv_df, market = args
+    mkt_df, market = args
     frames = []
+    if mkt_df is None or mkt_df.empty:
+        return frames
     for weeks in [26, 52, 104, 156, 208, 260]:
-        frames.append(will_co.calculateWillCo(csv_df, market, weeks))
+        result = will_co.calculateWillCo(mkt_df, market, weeks)
+        if result is not None and not result.empty:
+            frames.append(result)
     return frames
 
 def get_results_df():
@@ -124,8 +128,11 @@ def get_results_df():
             markets = MARKETS['contract_code'].tolist()
             frames = []
             
-            # Prepare arguments for parallel execution
-            args_list = [(csv_df, market) for market in markets]
+            # Group by market first - O(N) instead of O(M*N) filtering
+            grouped_df = {k: v for k, v in csv_df.groupby('cftc_contract_market_code')}
+
+            # Prepare arguments for parallel execution with pre-filtered DataFrames
+            args_list = [(grouped_df.get(market, pd.DataFrame()), market) for market in markets]
             
             # Use ThreadPoolExecutor to parallelize calculations
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:

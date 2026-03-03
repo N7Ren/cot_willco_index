@@ -55,7 +55,7 @@ class WillCo:
         begin_year = end_year - 7
         yearly_frames = []
         for i in reversed(range(begin_year, end_year)):
-            single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut')) 
+            single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut'))
             yearly_frames.append(single_year)
         df = pd.concat(yearly_frames, ignore_index=True) if yearly_frames else pd.DataFrame()
 
@@ -91,12 +91,14 @@ class WillCo:
         df['large_speculators_net_percent'] = df['percent_large_speculators_long'] - df['percent_large_speculators_short']
         df['small_speculators_net_percent'] = df['percent_small_speculators_long'] - df['percent_small_speculators_short']
 
-        
+
 
         df.to_csv(self.csv_path, index=False)
 
     def calculateWillCo(self, df, market, weeks):
         asset = df[df['cftc_contract_market_code'] == market].copy()
+        if asset.empty:
+            return pd.DataFrame()
 
         asset['lookback_(y)'] = "{:.1f}".format(weeks / 52)
 
@@ -144,8 +146,7 @@ class WillCo:
             asset['small_speculators_change_(%)'] = 0
 
 
-        return asset.head(1)[['market_and_exchange_names', 'lookback_(y)', 
-                              'willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index', 
+        return asset.head(1)[['market_and_exchange_names', 'lookback_(y)',
+                              'willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index',
                               'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)',
                               'commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)', 'as_of_date_in_form_yyyy_mm_dd']]
-    
