@@ -14,8 +14,7 @@ from markets_loader import load_markets_safe
 app = Flask(__name__)
 Compress(app)
 
-DEFAULT_LOW = 10
-DEFAULT_HIGH = 90
+from index_utils import clamp, normalize_thresholds, DEFAULT_LOW, DEFAULT_HIGH
 VALID_MODES = {"all", "setups", "asset", "percentchange"}
 
 csv_path = os.path.join(os.path.dirname(__file__), "cot.csv")
@@ -139,16 +138,6 @@ def get_results_df():
             _cached_table_html.clear()
             _cached_filtered_df.clear()
         return _cached_results_df
-
-def clamp(value, lower, upper):
-    return max(lower, min(value, upper))
-
-def normalize_thresholds(low, high):
-    low = clamp(low, 0, 100)
-    high = clamp(high, 0, 100)
-    if low >= high:
-        return DEFAULT_LOW, DEFAULT_HIGH
-    return low, high
 
 def parse_thresholds(values):
     try:
