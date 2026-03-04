@@ -1,7 +1,8 @@
 import os
+import subprocess
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask import Flask, render_template, request, redirect, url_for, make_response
+from flask import Flask, render_template, request, redirect, url_for, make_response, escape
 from flask_compress import Compress
 import pandas as pd
 from datetime import datetime, timezone
@@ -423,6 +424,36 @@ def nofilter():
 @app.route('/resources')
 def resources():
     return render_template('resources.html')
+
+@app.route('/api/system_info')
+def system_info():
+    # Securely handle system info request by validating against a whitelist
+    # and using subprocess.run with shell=False
+    ALLOWED_COMMANDS = {
+        'uptime': ['uptime'],
+        'df': ['df', '-h'],
+        'free': ['free', '-m']
+    }
+
+    cmd_key = request.args.get('cmd', 'uptime')
+
+    if cmd_key not in ALLOWED_COMMANDS:
+        return "Invalid command", 400
+
+    try:
+        # Securely execute the whitelisted command
+        result = subprocess.run(
+            ALLOWED_COMMANDS[cmd_key],
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=False
+        )
+        return f"<pre>{escape(result.stdout)}</pre>"
+    except subprocess.CalledProcessError as e:
+        return f"Error executing command: {escape(e.stderr)}", 500
+    except Exception as e:
+        return f"An unexpected error occurred: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(debug=True)
