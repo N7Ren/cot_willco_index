@@ -55,7 +55,7 @@ class WillCo:
         begin_year = end_year - 7
         yearly_frames = []
         for i in reversed(range(begin_year, end_year)):
-            single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut')) 
+            single_year = pd.DataFrame(cot.cot_year(i, cot_report_type='legacy_fut'))
             yearly_frames.append(single_year)
         df = pd.concat(yearly_frames, ignore_index=True) if yearly_frames else pd.DataFrame()
 
@@ -91,7 +91,7 @@ class WillCo:
         df['large_speculators_net_percent'] = df['percent_large_speculators_long'] - df['percent_large_speculators_short']
         df['small_speculators_net_percent'] = df['percent_small_speculators_long'] - df['percent_small_speculators_short']
 
-        
+
 
         df.to_csv(self.csv_path, index=False)
 
@@ -122,18 +122,32 @@ class WillCo:
         large_specs_range = maxQLargeSpeculatorsNWeeks - minQLargeSpeculatorsNWeeks
         small_specs_range = maxQSmallpeculatorsNWeeks - minQSmallpeculatorsNWeeks
 
-        asset['willco_commercials_index'] = round(((asset.iloc[0]['q_commercials'] - minQCommercialsNWeeks) / commercials_range) * 100) if commercials_range != 0 else 50
-        asset['willco_large_specs_index'] = round(((asset.iloc[0]['q_large_speculators'] - minQLargeSpeculatorsNWeeks) / large_specs_range) * 100) if large_specs_range != 0 else 50
-        asset['willco_small_specs_index'] = round(((asset.iloc[0]['q_small_speculators'] - minQSmallpeculatorsNWeeks) / small_specs_range) * 100) if small_specs_range != 0 else 50
+        # Optimization: Store row0 and row1 in variables to avoid repeated indexing calls
+        row0 = asset.iloc[0] if available > 0 else None
+        row1 = asset.iloc[1] if available > 1 else None
 
-        if weeks == 26:
-            asset['commercials_net_(%)'] = (asset.iloc[0]['commercials_net_percent'].round(2) * 100).astype(int)
-            asset['large_speculators_net_(%)'] = (asset.iloc[0]['large_speculators_net_percent'].round(2) * 100).astype(int)
-            asset['small_speculators_net_(%)'] = (asset.iloc[0]['small_speculators_net_percent'].round(2) * 100).astype(int)
+        if row0 is not None:
+            asset['willco_commercials_index'] = round(((row0['q_commercials'] - minQCommercialsNWeeks) / commercials_range) * 100) if commercials_range != 0 else 50
+            asset['willco_large_specs_index'] = round(((row0['q_large_speculators'] - minQLargeSpeculatorsNWeeks) / large_specs_range) * 100) if large_specs_range != 0 else 50
+            asset['willco_small_specs_index'] = round(((row0['q_small_speculators'] - minQSmallpeculatorsNWeeks) / small_specs_range) * 100) if small_specs_range != 0 else 50
+        else:
+            asset['willco_commercials_index'] = 50
+            asset['willco_large_specs_index'] = 50
+            asset['willco_small_specs_index'] = 50
 
-            asset['commercials_change_(%)'] = ((asset.iloc[0]['percent_commercials_long'] - asset.iloc[1]['percent_commercials_long']).round(2) * 100).astype(int)
-            asset['large_speculators_change_(%)'] = ((asset.iloc[0]['percent_large_speculators_long'] - asset.iloc[1]['percent_large_speculators_long']).round(2) * 100).astype(int)
-            asset['small_speculators_change_(%)'] = ((asset.iloc[0]['percent_small_speculators_long'] - asset.iloc[1]['percent_small_speculators_long']).round(2) * 100).astype(int)
+        if weeks == 26 and row0 is not None:
+            asset['commercials_net_(%)'] = (row0['commercials_net_percent'].round(2) * 100).astype(int)
+            asset['large_speculators_net_(%)'] = (row0['large_speculators_net_percent'].round(2) * 100).astype(int)
+            asset['small_speculators_net_(%)'] = (row0['small_speculators_net_percent'].round(2) * 100).astype(int)
+
+            if row1 is not None:
+                asset['commercials_change_(%)'] = ((row0['percent_commercials_long'] - row1['percent_commercials_long']).round(2) * 100).astype(int)
+                asset['large_speculators_change_(%)'] = ((row0['percent_large_speculators_long'] - row1['percent_large_speculators_long']).round(2) * 100).astype(int)
+                asset['small_speculators_change_(%)'] = ((row0['percent_small_speculators_long'] - row1['percent_small_speculators_long']).round(2) * 100).astype(int)
+            else:
+                asset['commercials_change_(%)'] = 0
+                asset['large_speculators_change_(%)'] = 0
+                asset['small_speculators_change_(%)'] = 0
         else:
             asset['commercials_net_(%)'] = 0
             asset['large_speculators_net_(%)'] = 0
@@ -144,8 +158,7 @@ class WillCo:
             asset['small_speculators_change_(%)'] = 0
 
 
-        return asset.head(1)[['market_and_exchange_names', 'lookback_(y)', 
-                              'willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index', 
+        return asset.head(1)[['market_and_exchange_names', 'lookback_(y)',
+                              'willco_commercials_index', 'willco_large_specs_index', 'willco_small_specs_index',
                               'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)',
                               'commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)', 'as_of_date_in_form_yyyy_mm_dd']]
-    
