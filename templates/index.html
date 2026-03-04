@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataFrame Table</title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <title>WillCo Index Calculations</title>
     <style>
@@ -80,7 +79,12 @@
     </div>
     <h1>WillCo Index Calculations</h1>
     <div class="button-container">
-        <form method="POST" action="/fetch_and_store">
+        <form method="POST" action="/fetch_and_store" onsubmit="
+            const btn = this.querySelector('button[type=submit]');
+            btn.disabled = true;
+            btn.innerHTML = '<span class=\'spinner-border spinner-border-sm\' role=\'status\' aria-hidden=\'true\'></span> Fetching...';
+            // Allow form to submit by not returning false
+        ">
             <input type="hidden" name="mode" value="{{ mode }}">
             <input type="hidden" name="low" value="{{ low }}">
             <input type="hidden" name="high" value="{{ high }}">
