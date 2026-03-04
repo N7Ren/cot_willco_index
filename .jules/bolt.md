@@ -1,0 +1,3 @@
+## 2024-03-04 - Pandas Performance Bottleneck
+**Learning:** Repeatedly filtering a large pandas DataFrame inside a loop (`df[df['col'] == val]`) across multiple conditions (e.g., markets and lookback periods) is incredibly slow and highly fragmented if you mutate them. Passing smaller fragments back and forth inside `ThreadPoolExecutor` isn't a silver bullet.
+**Action:** When working with Pandas, pre-group the data upfront using `df.groupby('col')` and iterate through `grouped.get_group(val)`. Compute results into standard python dictionaries inside the loops, and only convert to a pandas DataFrame once at the very end (`pd.DataFrame(results)`).
