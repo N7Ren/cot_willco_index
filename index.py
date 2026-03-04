@@ -174,15 +174,6 @@ def color_index(val, low, high):
         return 'color:green'
     return 'color: white'
 
-def color_percent(val, column):
-    if column in ('commercials_net_(%)', 'large_speculators_net_(%)', 'small_speculators_net_(%)', 'commercials_change_(%)', 'large_speculators_change_(%)', 'small_speculators_change_(%)'):
-        if val < 0:
-            return 'color: red'
-        elif val > 0:
-            return 'color: green'
-    return 'color: white'
-
-
 def _compute_index_colors_vectorized(df, low, high):
     """
     Pre-compute color arrays for willco index columns using vectorized NumPy operations.
