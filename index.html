@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Williams Commercial Index Calculations (COT data)</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .container-fluid {
+            padding: 20px;
+        }
+
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+
+        .threshold-input {
+            width: 70px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            padding: 2px 5px;
+        }
+
+        .nav-bar {
+            background-color: #1a1a1a;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .nav-bar a {
+            color: #ddd;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .nav-bar a:hover {
+            color: white;
+        }
+
+        .nav-bar a.active {
+            color: #007bff;
+        }
+
+        .styled-table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+
+        th {
+            background-color: #1a1a1a;
+            position: sticky;
+            top: 0;
+        }
+
+        .text-red { color: #ff4d4d !important; }
+        .text-green { color: #00ff00 !important; }
+        .text-white { color: white !important; }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #last-updated {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading-overlay">
+        <h2>Loading Data...</h2>
+    </div>
+
+    <div class="nav-bar">
+        <a href="index.html" class="active">Home</a>
+        <a href="resources.html">Resources</a>
+    </div>
+
+    <div class="container-fluid">
+        <h1>Williams Commercial Index Calculations (COT data)</h1>
+        <div id="last-updated"></div>
+
+        <div class="button-container">
+            <div class="controls-group">
+                <label for="low">Low:</label>
+                <input class="threshold-input" type="number" id="low" min="0" max="100" step="1">
+                <label for="high">High:</label>
+                <input class="threshold-input" type="number" id="high" min="0" max="100" step="1">
+                <button class="btn btn-sm btn-primary" onclick="applyFilters()">Apply</button>
+            </div>
+
+            <button class="btn btn-sm btn-outline-light" onclick="setMode('setups')">Show potential setups</button>
+            <button class="btn btn-sm btn-outline-light" onclick="setMode('percentchange')">Show % changes >= 5%</button>
+
+            <div class="controls-group">
+                <label for="asset_dropdown">Asset:</label>
+                <select id="asset_dropdown" class="threshold-input" style="width: 200px;" onchange="setMode('asset')">
+                    <option value="">Select an Asset</option>
+                </select>
+            </div>
+
+            <button class="btn btn-sm btn-secondary" onclick="setMode('all')">Reset</button>
+        </div>
+
+        <div class="styled-table-container">
+            <table id="data-table">
+                <thead id="table-head"></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let metadata = {};
+        let currentMode = 'all';
+        let sortConfig = { key: 'market_and_exchange_names', direction: 'asc' };
+
+        async function init() {
+            try {
+                const response = await fetch('data.json');
+                const result = await response.json();
+                allData = result.data;
+                metadata = result.metadata;
+
+                // Set initial values
+                document.getElementById('low').value = metadata.default_low;
+                document.getElementById('high').value = metadata.default_high;
+                document.getElementById('last-updated').innerText = `Data Last Updated: ${metadata.last_updated}`;
+
+                // Populate dropdown
+                const dropdown = document.getElementById('asset_dropdown');
+                metadata.markets.forEach(market => {
+                    const opt = document.createElement('option');
+                    opt.value = market;
+                    opt.innerText = market;
+                    dropdown.appendChild(opt);
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                renderTable();
+            } catch (error) {
+                console.error("Error loading data:", error);
+                document.getElementById('loading').innerHTML = `<h2>Error loading data.json</h2>`;
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'all') {
+                document.getElementById('asset_dropdown').value = "";
+            }
+            renderTable();
+        }
+
+        function handleSort(key) {
+            if (sortConfig.key === key) {
+                sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortConfig.key = key;
+                sortConfig.direction = 'asc';
+            }
+            renderTable();
+        }
+
+        function applyFilters() {
+            renderTable();
+        }
+
+        function getColorClass(val, type, low, high) {
+            if (type === 'index') {
+                if (val <= low) return 'text-red';
+                if (val >= high) return 'text-green';
+            } else if (type === 'percent') {
+                if (val < 0) return 'text-red';
+                if (val > 0) return 'text-green';
+            }
+            return 'text-white';
+        }
+
+        function renderTable() {
+            const low = parseInt(document.getElementById('low').value);
+            const high = parseInt(document.getElementById('high').value);
+            const selectedAsset = document.getElementById('asset_dropdown').value;
+
+            let filtered = [...allData];
+
+            if (currentMode === 'setups') {
+                filtered = filtered.filter(row => 
+                    row.willco_commercials_index >= high || row.willco_commercials_index <= low ||
+                    row.willco_large_specs_index >= high || row.willco_large_specs_index <= low ||
+                    row.willco_small_specs_index >= high || row.willco_small_specs_index <= low
+                );
+            } else if (currentMode === 'asset' && selectedAsset) {
+                filtered = filtered.filter(row => row.market_and_exchange_names === selectedAsset);
+            } else if (currentMode === 'percentchange') {
+                filtered = filtered.filter(row => 
+                    Math.abs(row['commercials_change_(%)']) >= 5 ||
+                    Math.abs(row['large_speculators_change_(%)']) >= 5 ||
+                    Math.abs(row['small_speculators_change_(%)']) >= 5
+                );
+            }
+
+            // Apply Sorting
+            filtered.sort((a, b) => {
+                let valA = a[sortConfig.key];
+                let valB = b[sortConfig.key];
+                
+                if (typeof valA === 'string') {
+                    return sortConfig.direction === 'asc' 
+                        ? valA.localeCompare(valB) 
+                        : valB.localeCompare(valA);
+                } else {
+                    return sortConfig.direction === 'asc' 
+                        ? valA - valB 
+                        : valB - valA;
+                }
+            });
+
+            const tbody = document.getElementById('table-body');
+            const thead = document.getElementById('table-head');
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100%">No data available.</td></tr>';
+                return;
+            }
+
+            // Define columns and their display names
+            const columns = [
+                { id: 'market_and_exchange_names', label: 'Market' },
+                { id: 'lookback_(y)', label: 'Years' },
+                { id: 'willco_commercials_index', label: 'Comm Index', type: 'index' },
+                { id: 'willco_large_specs_index', label: 'Large Specs Index', type: 'index' },
+                { id: 'willco_small_specs_index', label: 'Small Specs Index', type: 'index' },
+                { id: 'commercials_net_(%)', label: 'Comm Net (%)', type: 'percent' },
+                { id: 'large_speculators_net_(%)', label: 'Large Specs Net (%)', type: 'percent' },
+                { id: 'small_speculators_net_(%)', label: 'Small Specs Net (%)', type: 'percent' },
+                { id: 'commercials_change_(%)', label: 'Comm Change (%)', type: 'percent' },
+                { id: 'large_speculators_change_(%)', label: 'Large Specs Change (%)', type: 'percent' },
+                { id: 'small_speculators_change_(%)', label: 'Small Specs Change (%)', type: 'percent' },
+                { id: 'as_of_date_in_form_yyyy_mm_dd', label: 'Date' }
+            ];
+
+            // Render Head
+            thead.innerHTML = `<tr>${columns.map(c => {
+                const isSorted = sortConfig.key === c.id;
+                const arrow = isSorted ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : '';
+                return `<th onclick="handleSort('${c.id}')" style="cursor: pointer; white-space: nowrap;">${c.label}${arrow}</th>`;
+            }).join('')}</tr>`;
+
+            // Render Body
+            tbody.innerHTML = filtered.map(row => {
+                return `<tr>${columns.map(col => {
+                    let val = row[col.id];
+                    let displayVal = val;
+                    
+                    if (col.id === 'lookback_(y)') {
+                        // Convert "1.0" to 1, but keep "0.5"
+                        displayVal = parseFloat(val);
+                    } else if (typeof val === 'number') {
+                        // Format to 2 decimals but remove trailing zeros (e.g. 10.00 -> 10, 10.50 -> 10.5)
+                        displayVal = parseFloat(val.toFixed(2));
+                    }
+                    
+                    const colorClass = getColorClass(val, col.type, low, high);
+                    return `<td class="${colorClass}">${displayVal}</td>`;
+                }).join('')}</tr>`;
+            }).join('');
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

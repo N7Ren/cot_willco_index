@@ -1,23 +1,6 @@
 # cot_willco_index
 
-`cot_willco_index` is a Flask app that builds and displays Williams Commercial Index-style signals from CFTC legacy futures Commitments of Traders (COT) data.
-
-## Current repository analysis
-
-The current codebase is a compact single-app layout with three active source files:
-
-- `index.py`: Flask routes, hard-coded market list, table generation, and UI filtering behavior
-- `willco.py`: COT data fetch/storage and WillCo metric calculation logic
-- `templates/index.html`: Bootstrap-based UI template
-
-Current tracked repo files:
-
-- `index.py`
-- `willco.py`
-- `templates/index.html`
-- `markets.csv` - Market configuration file (see [MARKETS_GUIDE.md](MARKETS_GUIDE.md))
-- `README.md`
-- `LICENSE`
+`cot_willco_index` is a static web application that builds and displays Williams Commercial Index-style signals from CFTC legacy futures Commitments of Traders (COT) data.
 
 ## Functional behavior
 
@@ -36,59 +19,53 @@ The app:
   - 156 weeks (3y)
   - 208 weeks (4y)
   - 260 weeks (5y)
-- Renders a table with color highlighting and filters
+- Renders a purely static table with instant JavaScript-based filtering and highlighting
 
-## Data flow
+## Usage
 
-1. `WillCo` initializes with `cot.csv` path.
-2. If `cot.csv` does not exist, it fetches roughly 7 years of COT data and writes `cot.csv`.
-3. Flask loads CSV data and computes per-market results for all lookbacks.
-4. Results are rendered in the HTML table.
+### Generate Data
+Run the build script to fetch the latest COT data, calculate all indices, and export them to JSON:
+```bash
+python3 build.py
+```
 
-## Routes and UI actions
+### View Dashboard
+Open `index.html` in your browser. Since it uses the Fetch API to load `data.json`, it is best viewed via a local web server:
+```bash
+# Using Python
+python3 -m http.server 8000
+# Then visit http://localhost:8000/index.html
+```
 
-- `GET /`: full unfiltered table
-- `POST /fetch_and_store`: refresh local COT data
-- `POST /indexfilter`: show extreme index setups
-- `POST /assetfilter`: show selected asset only
-- `POST /nofilter`: clear filters and return to full table
+## Architecture
 
-Note: `POST /percentchangefilter` exists in code but is not currently wired to a visible button in `templates/index.html`.
+- **`build.py`**: Static site generator. It updates `cot.csv`, calculates metrics, and outputs `data.json`.
+- **`willco.py`**: Core logic for COT data processing and WillCo Index calculations.
+- **`index.html`**: Purely static frontend with JavaScript-based filtering and rendering.
+- **`resources.html`**: Static resources and documentation page.
+- **`markets.csv`**: Configuration file for tracked commodity markets.
+- **`cot.csv`**: Local cache of downloaded COT data.
+- **`data.json`**: Pre-calculated data exported for the frontend.
 
 ## Requirements
 
 - Python 3.10+
-- `flask`
 - `pandas`
+- `numpy`
 - `cot-reports`
 
-Recommended install (works on externally managed Python environments such as Debian/Ubuntu):
+Recommended install:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install flask pandas cot-reports
+python -m pip install -r requirements.txt
 ```
-
-## Run
-
-```bash
-. .venv/bin/activate
-python index.py
-```
-
-Open `http://127.0.0.1:5000`.
-
-## Implementation notes
-
-- Market universe is configured in `markets.csv` (see [MARKETS_GUIDE.md](MARKETS_GUIDE.md) for how to customize).
-- `cot.csv` is expected at repository root and is generated on first run if missing.
-- The app runs with `debug=True` in `index.py`.
 
 ## Customizing Markets
 
-The application loads its market list from `markets.csv`, which can be easily edited to add, remove, or modify markets without changing any code. See [MARKETS_GUIDE.md](MARKETS_GUIDE.md) for detailed instructions on how to customize the market list.
+The application loads its market list from `markets.csv`. See [MARKETS_GUIDE.md](MARKETS_GUIDE.md) for detailed instructions on how to customize the market list.
 
 ## License
 

@@ -1,5 +1,3 @@
-flask
-flask-compress
 pandas
 numpy
 cot-reports
