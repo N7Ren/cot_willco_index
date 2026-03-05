@@ -87,6 +87,11 @@
             top: 0;
         }
 
+        th:focus-visible {
+            outline: 2px solid #007bff;
+            outline-offset: -2px;
+        }
+
         .text-red { color: #ff4d4d !important; }
         .text-green { color: #00ff00 !important; }
         .text-white { color: white !important; }
@@ -328,7 +333,8 @@
             thead.innerHTML = `<tr>${columns.map(c => {
                 const isSorted = sortConfig.key === c.id;
                 const arrow = isSorted ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : '';
-                return `<th onclick="handleSort('${c.id}')" style="cursor: pointer; white-space: nowrap;">${c.label}${arrow}</th>`;
+                const ariaSort = isSorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+                return `<th onclick="handleSort('${c.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleSort('${c.id}');}" tabindex="0" role="columnheader" aria-sort="${ariaSort}" style="cursor: pointer; white-space: nowrap;" title="Sort by ${c.label}">${c.label}${arrow}</th>`;
             }).join('')}</tr>`;
 
             // Render Body
