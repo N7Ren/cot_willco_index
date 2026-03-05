@@ -137,12 +137,25 @@
 
             <div class="controls-group">
                 <label for="asset_dropdown">Asset:</label>
-                <select id="asset_dropdown" class="threshold-input" style="width: 200px;" onchange="setMode('asset')">
-                    <option value="">Select an Asset</option>
+                <select id="asset_dropdown" class="threshold-input" style="width: 200px;" onchange="applyFilters()">
+                    <option value="">All Assets</option>
                 </select>
             </div>
 
-            <button class="btn btn-sm btn-secondary" onclick="setMode('all')">Reset</button>
+            <div class="controls-group">
+                <label for="year_dropdown">Years:</label>
+                <select id="year_dropdown" class="threshold-input" style="width: 80px;" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="0.5">0.5</option>
+                    <option value="1.0">1</option>
+                    <option value="2.0">2</option>
+                    <option value="3.0">3</option>
+                    <option value="4.0">4</option>
+                    <option value="5.0">5</option>
+                </select>
+            </div>
+
+            <button class="btn btn-sm btn-secondary" onclick="resetFilters()">Reset</button>
         </div>
 
         <p style="font-size: 0.9rem; color: #888; margin-bottom: 20px;">If you want to learn more about how to use this data in your trading see <a href="resources.html">Resources</a></p>
@@ -198,9 +211,15 @@
 
         function setMode(mode) {
             currentMode = mode;
-            if (mode === 'all') {
-                document.getElementById('asset_dropdown').value = "";
-            }
+            renderTable();
+        }
+
+        function resetFilters() {
+            currentMode = 'all';
+            document.getElementById('asset_dropdown').value = "";
+            document.getElementById('year_dropdown').value = "";
+            document.getElementById('low').value = metadata.default_low;
+            document.getElementById('high').value = metadata.default_high;
             renderTable();
         }
 
@@ -233,23 +252,34 @@
             const low = parseInt(document.getElementById('low').value);
             const high = parseInt(document.getElementById('high').value);
             const selectedAsset = document.getElementById('asset_dropdown').value;
+            const selectedYear = document.getElementById('year_dropdown').value;
 
             let filtered = [...allData];
 
+            // 1. Primary Filter (Mode)
             if (currentMode === 'setups') {
                 filtered = filtered.filter(row => 
                     row.willco_commercials_index >= high || row.willco_commercials_index <= low ||
                     row.willco_large_specs_index >= high || row.willco_large_specs_index <= low ||
                     row.willco_small_specs_index >= high || row.willco_small_specs_index <= low
                 );
-            } else if (currentMode === 'asset' && selectedAsset) {
-                filtered = filtered.filter(row => row.market_and_exchange_names === selectedAsset);
             } else if (currentMode === 'percentchange') {
                 filtered = filtered.filter(row => 
                     Math.abs(row['commercials_change_(%)']) >= 5 ||
                     Math.abs(row['large_speculators_change_(%)']) >= 5 ||
                     Math.abs(row['small_speculators_change_(%)']) >= 5
                 );
+            }
+
+            // 2. Secondary Filter (Asset Dropdown)
+            if (selectedAsset) {
+                filtered = filtered.filter(row => row.market_and_exchange_names === selectedAsset);
+            }
+
+            // 3. Secondary Filter (Year Dropdown)
+            if (selectedYear) {
+                // lookback_(y) values are strings like "0.5", "1.0", "2.0", etc.
+                filtered = filtered.filter(row => row['lookback_(y)'] === selectedYear);
             }
 
             // Apply Sorting
