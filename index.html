@@ -315,12 +315,12 @@
                 { id: 'willco_commercials_index', label: 'Comm Index', type: 'index' },
                 { id: 'willco_large_specs_index', label: 'Large Specs Index', type: 'index' },
                 { id: 'willco_small_specs_index', label: 'Small Specs Index', type: 'index' },
-                { id: 'commercials_net_(%)', label: 'Comm Net (%)', type: 'percent' },
-                { id: 'large_speculators_net_(%)', label: 'Large Specs Net (%)', type: 'percent' },
-                { id: 'small_speculators_net_(%)', label: 'Small Specs Net (%)', type: 'percent' },
-                { id: 'commercials_change_(%)', label: 'Comm Change (%)', type: 'percent' },
-                { id: 'large_speculators_change_(%)', label: 'Large Specs Change (%)', type: 'percent' },
-                { id: 'small_speculators_change_(%)', label: 'Small Specs Change (%)', type: 'percent' },
+                { id: 'commercials_net_(%)', label: 'Comm Net', type: 'percent' },
+                { id: 'large_speculators_net_(%)', label: 'Large Specs Net', type: 'percent' },
+                { id: 'small_speculators_net_(%)', label: 'Small Specs Net', type: 'percent' },
+                { id: 'commercials_change_(%)', label: 'Comm Change', type: 'percent' },
+                { id: 'large_speculators_change_(%)', label: 'Large Specs Change', type: 'percent' },
+                { id: 'small_speculators_change_(%)', label: 'Small Specs Change', type: 'percent' },
                 { id: 'as_of_date_in_form_yyyy_mm_dd', label: 'Date' }
             ];
 
@@ -343,6 +343,11 @@
                     } else if (typeof val === 'number') {
                         // Format to 2 decimals but remove trailing zeros (e.g. 10.00 -> 10, 10.50 -> 10.5)
                         displayVal = parseFloat(val.toFixed(2));
+                        
+                        // Add % sign for percent columns
+                        if (col.type === 'percent') {
+                            displayVal = displayVal + '%';
+                        }
                     }
                     
                     const colorClass = getColorClass(val, col.type, low, high);
