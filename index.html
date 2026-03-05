@@ -192,9 +192,11 @@
                 document.getElementById('high').value = metadata.default_high;
                 document.getElementById('last-updated').innerText = `Data Last Updated: ${metadata.last_updated}`;
 
-                // Populate dropdown
+                // Populate dropdown (sorted alphabetically)
                 const dropdown = document.getElementById('asset_dropdown');
-                metadata.markets.forEach(market => {
+                const sortedMarkets = [...metadata.markets].sort((a, b) => a.localeCompare(b));
+                
+                sortedMarkets.forEach(market => {
                     const opt = document.createElement('option');
                     opt.value = market;
                     opt.innerText = market;
