@@ -34,14 +34,14 @@ contract_code,contract_name
    123456,NEW MARKET NAME
    ```
 3. Save the file
-4. Restart the application for changes to take effect
+4. Run `python3 build.py` for changes to take effect
 
 ## How to Remove a Market
 
 1. Open `markets.csv`
 2. Delete the entire row for the market you want to remove
 3. Save the file
-4. Restart the application
+4. Run `python3 build.py` to update the data.json file with your changes.
 
 ## How to Edit a Market Name
 
@@ -49,7 +49,7 @@ contract_code,contract_name
 2. Find the row with the market you want to edit
 3. Change the `contract_name` value (keep the `contract_code` unchanged)
 4. Save the file
-5. Restart the application
+5. Run `python3 build.py` to update the data.json file with your changes.
 
 ## Important Notes
 
