@@ -38,20 +38,29 @@ def build_static_site():
     market_codes = markets_df['contract_code'].tolist()
     
     print(f"Calculating data for {len(market_codes)} markets...")
+
+    # Bolt Optimization: Pre-group data by market code to avoid repeated full-dataframe filtering inside loops.
+    # This turns O(N*M) filtering into O(N) grouping + O(1) lookups.
+    grouped_csv_df = {market: group for market, group in csv_df.groupby('cftc_contract_market_code')}
+
     for market in market_codes:
+        if market not in grouped_csv_df:
+            continue
+        market_df = grouped_csv_df[market]
         for weeks in [26, 52, 104, 156, 208, 260]:
-            df = will_co.calculateWillCo(csv_df, market, weeks)
+            df = will_co.calculateWillCo(market_df, market, weeks)
             if not df.empty:
                 # Add weeks as an explicit column for the frontend
                 row = df.iloc[0].to_dict()
                 row['weeks'] = weeks
-                all_results.append(pd.DataFrame([row]))
+                # Bolt Optimization: Append standard Python dicts to a list instead of creating/concat single-row DataFrames
+                all_results.append(row)
     
     if not all_results:
         print("No data calculated!")
         return
 
-    results_df = pd.concat(all_results, ignore_index=True)
+    results_df = pd.DataFrame(all_results)
     
     # Convert to JSON-friendly format
     # We'll use records format (list of dicts)
