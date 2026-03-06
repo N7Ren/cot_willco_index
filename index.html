@@ -85,6 +85,13 @@
             background-color: #1a1a1a;
             position: sticky;
             top: 0;
+            outline: none;
+        }
+
+        th:focus-visible {
+            outline: 2px solid #007bff;
+            outline-offset: -2px;
+            background-color: #333;
         }
 
         .text-red { color: #ff4d4d !important; }
@@ -328,7 +335,16 @@
             thead.innerHTML = `<tr>${columns.map(c => {
                 const isSorted = sortConfig.key === c.id;
                 const arrow = isSorted ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : '';
-                return `<th onclick="handleSort('${c.id}')" style="cursor: pointer; white-space: nowrap;">${c.label}${arrow}</th>`;
+                const ariaSort = isSorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+                return `<th
+                    onclick="handleSort('${c.id}')"
+                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleSort('${c.id}'); }"
+                    style="cursor: pointer; white-space: nowrap;"
+                    tabindex="0"
+                    role="button"
+                    aria-sort="${ariaSort}"
+                    title="Sort by ${c.label}"
+                >${c.label}${arrow}</th>`;
             }).join('')}</tr>`;
 
             // Render Body
